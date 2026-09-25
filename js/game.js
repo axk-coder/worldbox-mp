@@ -44,10 +44,10 @@ class GameEngine {
     this.projectiles = [];
     this.fx = [];
 
-    this.spawnKingdom('blue', 'Blue Realm', 30, 30);
-    this.spawnKingdom('red', 'Red Empire', 130, 130);
-    this.spawnKingdom('green', 'Green Dominion', 30, 130);
-    this.spawnKingdom('yellow', 'Golden Horde', 130, 30);
+    this.spawnKingdom('HUMAN', 'Human Realm', 30, 30);
+    this.spawnKingdom('ORC', 'Orc Horde', 130, 130);
+    this.spawnKingdom('ELF', 'Elven Dominion', 30, 130);
+    this.spawnKingdom('DWARF', 'Dwarven Hold', 130, 30);
 
     this.centerCameraOn(80, 80);
   }
@@ -57,26 +57,28 @@ class GameEngine {
     this.camera.y = (ty * CONFIG.TILE_SIZE * this.camera.zoom) - (this.canvas.height / 2);
   }
 
-  spawnKingdom(kingdomKey, name, x, y) {
+  spawnKingdom(raceKey, name, x, y) {
+    const raceConfig = CONFIG.RACES[raceKey] || CONFIG.RACES.HUMAN;
+    const kingdomKey = raceConfig.kingdomKey;
     const tId = `t_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-    const town = new Town(tId, name, x, y, this.playerId, kingdomKey);
+    const town = new Town(tId, name, raceKey, x, y, this.playerId, kingdomKey);
     this.towns.push(town);
 
     for (let i = 0; i < 5; i++) {
-      this.spawnUnit('WORKER', x + (i % 3) - 1, y + Math.floor(i / 3) - 1, this.playerId, kingdomKey, tId);
+      this.spawnUnit('WORKER', raceKey, x + (i % 3) - 1, y + Math.floor(i / 3) - 1, this.playerId, kingdomKey, tId);
     }
     for (let i = 0; i < 4; i++) {
-      this.spawnUnit('INFANTRY', x + (i % 2), y + 2, this.playerId, kingdomKey, tId);
+      this.spawnUnit('INFANTRY', raceKey, x + (i % 2), y + 2, this.playerId, kingdomKey, tId);
     }
     for (let i = 0; i < 3; i++) {
-      this.spawnUnit('ARCHER', x + (i % 2) - 1, y - 2, this.playerId, kingdomKey, tId);
+      this.spawnUnit('ARCHER', raceKey, x + (i % 2) - 1, y - 2, this.playerId, kingdomKey, tId);
     }
     return town;
   }
 
-  spawnUnit(type, x, y, ownerId, kingdomKey = 'blue', townId = null) {
+  spawnUnit(type, raceKey, x, y, ownerId, kingdomKey = 'blue', townId = null) {
     const uId = `u_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-    const unit = new Unit(uId, type, x, y, ownerId, kingdomKey, townId);
+    const unit = new Unit(uId, type, raceKey, x, y, ownerId, kingdomKey, townId);
     this.units.push(unit);
     return unit;
   }
@@ -114,6 +116,8 @@ class GameEngine {
       this.projectiles.push(proj);
     } else if (packet.type === 'BRUSH_TERRAIN') {
       this.world.applyBrush(packet.x, packet.y, packet.radius, packet.tool);
+    } else if (packet.type === 'SPAWN_CREATURE') {
+      this.spawnUnit('INFANTRY', packet.raceKey, packet.x, packet.y, packet.sender, CONFIG.RACES[packet.raceKey].kingdomKey);
     }
   }
 
@@ -139,23 +143,23 @@ class GameEngine {
         const tx = Math.floor(worldPos.x);
         const ty = Math.floor(worldPos.y);
 
-        if (this.activeTool === 'SELECT') {
+        if (this.activeTool === 'INSPECT') {
+          const clickedUnit = this.units.find(u => Math.hypot(u.x - worldPos.x, u.y - worldPos.y) < 1.2);
+          if (clickedUnit) {
+            this.showCreatureInspector(clickedUnit);
+          }
+        } else if (this.activeTool === 'SELECT') {
           this.dragStart = { x: e.clientX, y: e.clientY };
         } else if (['RAISE_LAND', 'LOWER_LAND', 'PLANT_FOREST', 'BUILD_MOUNTAIN'].includes(this.activeTool)) {
           this.world.applyBrush(tx, ty, 3, this.activeTool);
           this.socketManager.send({ type: 'BRUSH_TERRAIN', x: tx, y: ty, radius: 3, tool: this.activeTool, sender: this.playerId });
-        } else if (['BOMB', 'MISSILE', 'NUKE'].includes(this.activeTool)) {
+        } else if (['BOMB', 'MISSILE', 'NUKE', 'ACID'].includes(this.activeTool)) {
           this.launchWeapon(this.activeTool, worldPos.x, worldPos.y);
-        } else if (this.activeTool === 'SPAWN_KINGDOM_BLUE') {
-          this.spawnKingdom('blue', 'Blue Kingdom', tx, ty);
-        } else if (this.activeTool === 'SPAWN_KINGDOM_RED') {
-          this.spawnKingdom('red', 'Red Kingdom', tx, ty);
-        } else if (this.activeTool === 'SPAWN_BOAT') {
-          this.spawnUnit('BOAT_CANNON', tx, ty, this.playerId, this.playerKingdom);
-        } else if (this.activeTool === 'SPAWN_ARMY') {
-          for (let i = 0; i < 4; i++) {
-            this.spawnUnit(i % 2 === 0 ? 'INFANTRY' : 'ARCHER', tx + (i % 2), ty + Math.floor(i / 2), this.playerId, this.playerKingdom);
-          }
+        } else if (['SPAWN_HUMAN', 'SPAWN_ORC', 'SPAWN_ELF', 'SPAWN_DWARF'].includes(this.activeTool)) {
+          const raceKey = this.activeTool.replace('SPAWN_', '');
+          const kingdomKey = CONFIG.RACES[raceKey].kingdomKey;
+          this.spawnUnit('INFANTRY', raceKey, tx, ty, this.playerId, kingdomKey);
+          this.socketManager.send({ type: 'SPAWN_CREATURE', raceKey, x: tx, y: ty, sender: this.playerId });
         }
       }
     });
@@ -207,6 +211,22 @@ class GameEngine {
       this.camera.x += (mouseWorldBefore.x - mouseWorldAfter.x) * CONFIG.TILE_SIZE * this.camera.zoom;
       this.camera.y += (mouseWorldBefore.y - mouseWorldAfter.y) * CONFIG.TILE_SIZE * this.camera.zoom;
     });
+  }
+
+  showCreatureInspector(unit) {
+    const modal = document.getElementById('modal-inspector');
+    if (!modal) return;
+
+    document.getElementById('inspect-name').innerText = unit.name;
+    document.getElementById('inspect-race').innerText = CONFIG.RACES[unit.raceKey] ? CONFIG.RACES[unit.raceKey].name : unit.raceKey;
+    document.getElementById('inspect-kingdom').innerText = CONFIG.KINGDOM_COLORS[unit.kingdomKey] ? CONFIG.KINGDOM_COLORS[unit.kingdomKey].name : unit.kingdomKey;
+    document.getElementById('inspect-hp').innerText = `${Math.round(unit.hp)} / ${unit.maxHp}`;
+    document.getElementById('inspect-atk').innerText = unit.stats.atk;
+    document.getElementById('inspect-kills').innerText = unit.kills;
+    document.getElementById('inspect-level').innerText = unit.level;
+    document.getElementById('inspect-state').innerText = unit.state;
+
+    modal.classList.remove('hidden');
   }
 
   finishBoxSelect(start, end) {
@@ -338,7 +358,7 @@ class GameEngine {
     this.units.forEach(u => {
       const sx = u.x * tileSize - this.camera.x;
       const sy = u.y * tileSize - this.camera.y;
-      const kColor = CONFIG.KINGDOM_COLORS[u.kingdomKey] ? CONFIG.KINGDOM_COLORS[u.kingdomKey].primary : '#ffffff';
+      const raceColor = CONFIG.RACES[u.raceKey] ? CONFIG.RACES[u.raceKey].color : '#ffffff';
 
       if (u.isNaval) {
         this.ctx.fillStyle = '#455a64';
@@ -346,16 +366,19 @@ class GameEngine {
         this.ctx.arc(sx + tileSize / 2, sy + tileSize / 2, tileSize * 0.45, 0, Math.PI * 2);
         this.ctx.fill();
 
-        this.ctx.fillStyle = kColor;
+        this.ctx.fillStyle = raceColor;
         this.ctx.beginPath();
         this.ctx.arc(sx + tileSize / 2, sy + tileSize / 2, tileSize * 0.2, 0, Math.PI * 2);
         this.ctx.fill();
       } else {
-        this.ctx.fillStyle = kColor;
-        this.ctx.fillRect(sx + tileSize * 0.2, sy + tileSize * 0.2, tileSize * 0.6, tileSize * 0.6);
+        this.ctx.fillStyle = raceColor;
+        this.ctx.beginPath();
+        this.ctx.arc(sx + tileSize / 2, sy + tileSize / 2, tileSize * 0.35, 0, Math.PI * 2);
+        this.ctx.fill();
+
         this.ctx.strokeStyle = '#000';
         this.ctx.lineWidth = 1;
-        this.ctx.strokeRect(sx + tileSize * 0.2, sy + tileSize * 0.2, tileSize * 0.6, tileSize * 0.6);
+        this.ctx.stroke();
       }
 
       if (u.selected) {
@@ -397,12 +420,12 @@ class GameEngine {
       const w = Math.abs(this.dragStart.x - this.currentMousePos.x);
       const h = Math.abs(this.dragStart.y - this.currentMousePos.y);
 
-      this.ctx.strokeStyle = '#00e676';
+      this.ctx.strokeStyle = '#3b82f6';
       this.ctx.lineWidth = 1.5;
       this.ctx.setLineDash([4, 4]);
       this.ctx.strokeRect(sx, sy, w, h);
       this.ctx.setLineDash([]);
-      this.ctx.fillStyle = 'rgba(0, 230, 118, 0.1)';
+      this.ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
       this.ctx.fillRect(sx, sy, w, h);
     }
   }

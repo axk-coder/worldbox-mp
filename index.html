@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WorldBox Simulation & RTS Multiplayer</title>
+  <title>WorldBox Sandbox & RTS Army Warfare</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -12,12 +12,12 @@
 
     <div class="top-bar">
       <div class="ui-panel title-panel">
-        <h1>WorldBox Simulation</h1>
-        <div class="subtitle">God Simulation & Kingdom Warfare</div>
+        <h1>WorldBox Sandbox</h1>
+        <div class="subtitle">God Simulation & RTS Army Command</div>
       </div>
 
       <div class="ui-panel speed-bar">
-        <span style="font-size:11px; color:#94a3b8; margin-right:4px;">Speed:</span>
+        <span style="font-size:11px; color:#94a3b8; margin-right:4px;">Simulation Speed:</span>
         <button class="btn" id="speed-pause">Pause</button>
         <button class="btn active" id="speed-1x">1x</button>
         <button class="btn" id="speed-2x">2x</button>
@@ -25,9 +25,9 @@
       </div>
 
       <div class="ui-panel stats-bar">
-        <div class="stat-item">Population: <span id="stat-population">0</span></div>
+        <div class="stat-item">Creatures: <span id="stat-population">0</span></div>
         <div class="stat-item">Kingdoms: <span id="stat-kingdoms">4</span></div>
-        <div class="stat-item">Mode: <span id="stat-mode">LAN P2P</span></div>
+        <div class="stat-item">Transport: <span id="stat-mode">LAN P2P</span></div>
       </div>
 
       <div class="ui-panel">
@@ -37,9 +37,9 @@
     </div>
 
     <div class="side-panel ui-panel">
-      <div class="panel-header">Simulation Tools</div>
+      <div class="panel-header">God Powers & Controls</div>
       <div class="control-row">
-        <label>Selected Tool:</label>
+        <label>Active Tool:</label>
         <span id="label-tool" style="font-weight:bold; color:#60a5fa;">Inspect</span>
       </div>
       <div class="control-row">
@@ -62,13 +62,14 @@
     <div class="bottom-toolbar">
       <div class="toolbar-row">
         <div class="tool-group">
-          <button class="btn active" data-tool="SELECT">Box Select</button>
-          <button class="btn-god btn" data-tool="SPAWN_KINGDOM_BLUE">Spawn Blue Realm</button>
-          <button class="btn-god btn" data-tool="SPAWN_KINGDOM_RED">Spawn Red Empire</button>
+          <button class="btn active" data-tool="INSPECT">Inspect</button>
+          <button class="btn" data-tool="SELECT">Box Select Army</button>
         </div>
         <div class="tool-group">
-          <button class="btn" data-tool="SPAWN_ARMY">Spawn Troops</button>
-          <button class="btn" data-tool="SPAWN_BOAT">Spawn Vessel</button>
+          <button class="btn-god btn" data-tool="SPAWN_HUMAN">Spawn Human</button>
+          <button class="btn-god btn" data-tool="SPAWN_ORC">Spawn Orc</button>
+          <button class="btn-god btn" data-tool="SPAWN_ELF">Spawn Elf</button>
+          <button class="btn-god btn" data-tool="SPAWN_DWARF">Spawn Dwarf</button>
         </div>
       </div>
 
@@ -83,6 +84,7 @@
           <button class="btn btn-danger" data-tool="BOMB">Drop Bomb</button>
           <button class="btn btn-danger" data-tool="MISSILE">Air Missile</button>
           <button class="btn btn-danger" data-tool="NUKE">Launch Nuke</button>
+          <button class="btn btn-danger" data-tool="ACID">Acid Rain</button>
         </div>
       </div>
     </div>
@@ -95,6 +97,25 @@
       <button id="btn-terms">Terms of Service</button>
       <span>|</span>
       <button id="btn-credits">Credits</button>
+    </div>
+
+    <div id="modal-inspector" class="modal-overlay hidden">
+      <div class="modal-box">
+        <h2>Creature Inspector</h2>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+          <div><strong>Name:</strong> <span id="inspect-name">--</span></div>
+          <div><strong>Race:</strong> <span id="inspect-race">--</span></div>
+          <div><strong>Kingdom:</strong> <span id="inspect-kingdom">--</span></div>
+          <div><strong>Health:</strong> <span id="inspect-hp">--</span></div>
+          <div><strong>Attack:</strong> <span id="inspect-atk">--</span></div>
+          <div><strong>Kills:</strong> <span id="inspect-kills">--</span></div>
+          <div><strong>Level:</strong> <span id="inspect-level">--</span></div>
+          <div><strong>Current Task:</strong> <span id="inspect-state">--</span></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" id="close-modal-inspector">Close</button>
+        </div>
+      </div>
     </div>
 
     <div id="modal-multiplayer" class="modal-overlay hidden">
@@ -116,7 +137,7 @@
     <div id="modal-privacy" class="modal-overlay hidden">
       <div class="modal-box">
         <h2>Privacy Policy</h2>
-        <p>WorldBox Simulation functions locally within client-side Web browser sandbox environments or peer-to-peer LAN sockets.</p>
+        <p>WorldBox Sandbox functions locally within client-side Web browser sandbox environments or peer-to-peer LAN sockets.</p>
         <p>No tracking cookies or user telemetry data are harvested or stored.</p>
         <div class="modal-actions">
           <button class="btn" id="close-modal-privacy">Close</button>
@@ -127,7 +148,7 @@
     <div id="modal-terms" class="modal-overlay hidden">
       <div class="modal-box">
         <h2>Terms of Service</h2>
-        <p>WorldBox Simulation is provided open-source under the standard MIT License agreement.</p>
+        <p>WorldBox Sandbox is provided open-source under the standard MIT License agreement.</p>
         <p>Users hold rights to run, copy, modify, and distribute local software builds.</p>
         <div class="modal-actions">
           <button class="btn" id="close-modal-terms">Close</button>
@@ -140,7 +161,7 @@
         <h2>Credits & Attribution</h2>
         <p>Engine Architecture & Design:</p>
         <ul>
-          <li>Simulation & Graphics Engine: Axk War Studios</li>
+          <li>WorldBox Simulation & RTS Engine: Axk War Studios</li>
           <li>Simplex Procedural Terrain: Open Noise Library</li>
           <li>WebRTC & Transport Adapters: Native Web APIs</li>
         </ul>
@@ -221,6 +242,9 @@
       bindModal('btn-privacy', 'modal-privacy', 'close-modal-privacy');
       bindModal('btn-terms', 'modal-terms', 'close-modal-terms');
       bindModal('btn-credits', 'modal-credits', 'close-modal-credits');
+      document.getElementById('close-modal-inspector').addEventListener('click', () => {
+        document.getElementById('modal-inspector').classList.add('hidden');
+      });
 
       setInterval(() => {
         if (!game) return;

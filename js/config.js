@@ -3,12 +3,17 @@ const CONFIG = {
   WORLD_HEIGHT: 160,
   TILE_SIZE: 16,
   TICKS_PER_SEC: 20,
+  RACES: {
+    HUMAN: { id: 'HUMAN', name: 'Humans', hp: 100, speed: 1.7, atk: 12, color: '#3b82f6', kingdomKey: 'blue' },
+    ORC: { id: 'ORC', name: 'Orcs', hp: 160, speed: 1.4, atk: 22, color: '#ef4444', kingdomKey: 'red' },
+    ELF: { id: 'ELF', name: 'Elves', hp: 90, speed: 2.1, atk: 16, color: '#10b981', kingdomKey: 'green' },
+    DWARF: { id: 'DWARF', name: 'Dwarves', hp: 140, speed: 1.3, atk: 18, color: '#eab308', kingdomKey: 'yellow' }
+  },
   KINGDOM_COLORS: {
-    blue: { primary: '#2979ff', border: 'rgba(41, 121, 255, 0.35)', name: 'Blue Realm' },
-    red: { primary: '#ff1744', border: 'rgba(255, 23, 68, 0.35)', name: 'Red Empire' },
-    green: { primary: '#00e676', border: 'rgba(0, 230, 118, 0.35)', name: 'Green Dominion' },
-    yellow: { primary: '#ffea00', border: 'rgba(255, 234, 0, 0.35)', name: 'Golden Horde' },
-    purple: { primary: '#d500f9', border: 'rgba(213, 0, 249, 0.35)', name: 'Purple Dynasty' }
+    blue: { primary: '#2563eb', border: 'rgba(37, 99, 235, 0.35)', name: 'Human Realm' },
+    red: { primary: '#dc2626', border: 'rgba(220, 38, 38, 0.35)', name: 'Orcish Horde' },
+    green: { primary: '#059669', border: 'rgba(5, 150, 105, 0.35)', name: 'Elven Dominion' },
+    yellow: { primary: '#d97706', border: 'rgba(217, 119, 6, 0.35)', name: 'Dwarven Hold' }
   },
   SOCKET_TYPES: {
     BROADCAST: 'BROADCAST_LAN',
@@ -39,17 +44,6 @@ const CONFIG = {
     7: '#263238',
     8: '#8d6e63'
   },
-  TILE_NAMES: {
-    0: 'Deep Ocean',
-    1: 'Shallow Waters',
-    2: 'Coastal Sand',
-    3: 'Grass Plains',
-    4: 'Dense Forest',
-    5: 'High Mountains',
-    6: 'Snowy Peak',
-    7: 'Scorched Crater',
-    8: 'Farmland'
-  },
   RESOURCES: {
     WOOD: 'wood',
     STONE: 'stone',
@@ -69,12 +63,12 @@ const CONFIG = {
     INFANTRY: { id: 'INFANTRY', hp: 120, speed: 1.8, atk: 18, range: 1, isNaval: false, cost: { food: 20, wood: 5 } },
     ARCHER: { id: 'ARCHER', hp: 85, speed: 1.7, atk: 14, range: 5, isNaval: false, cost: { food: 20, wood: 15 } },
     BOAT_CANNON: { id: 'BOAT_CANNON', hp: 300, speed: 2.4, atk: 40, range: 8, isNaval: true, cost: { wood: 60, gold: 20 } },
-    BOAT_TRANSPORT: { id: 'BOAT_TRANSPORT', hp: 250, speed: 2.6, atk: 0, range: 0, isNaval: true, cost: { wood: 40 } },
-    TANK: { id: 'TANK', hp: 450, speed: 1.3, atk: 55, range: 4, isNaval: false, cost: { stone: 50, gold: 30 } }
+    BOAT_TRANSPORT: { id: 'BOAT_TRANSPORT', hp: 250, speed: 2.6, atk: 0, range: 0, isNaval: true, cost: { wood: 40 } }
   },
   WEAPONS: {
     BOMB: { id: 'BOMB', blastRadius: 4, damage: 200, crater: true },
     MISSILE: { id: 'MISSILE', blastRadius: 7, damage: 400, crater: true },
-    NUKE: { id: 'NUKE', blastRadius: 14, damage: 1200, crater: true, radioactive: true }
+    NUKE: { id: 'NUKE', blastRadius: 14, damage: 1200, crater: true, radioactive: true },
+    ACID: { id: 'ACID', blastRadius: 5, damage: 150, crater: false }
   }
 };

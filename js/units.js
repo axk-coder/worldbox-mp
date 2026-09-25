@@ -1,7 +1,8 @@
 class Unit {
-  constructor(id, type, x, y, ownerId, kingdomKey = 'blue', townId = null) {
+  constructor(id, type, raceKey, x, y, ownerId, kingdomKey = 'blue', townId = null) {
     this.id = id;
     this.type = type;
+    this.raceKey = raceKey || 'HUMAN';
     this.x = x;
     this.y = y;
     this.targetX = x;
@@ -9,7 +10,22 @@ class Unit {
     this.ownerId = ownerId;
     this.kingdomKey = kingdomKey;
     this.townId = townId;
-    this.stats = CONFIG.UNITS[type] || CONFIG.UNITS.INFANTRY;
+    this.name = `${raceKey}_${Math.floor(Math.random() * 900 + 100)}`;
+    this.age = Math.floor(Math.random() * 25 + 18);
+    this.kills = 0;
+    this.level = 1;
+
+    const raceInfo = CONFIG.RACES[this.raceKey] || CONFIG.RACES.HUMAN;
+    const unitInfo = CONFIG.UNITS[type] || CONFIG.UNITS.INFANTRY;
+
+    this.stats = {
+      hp: raceInfo.hp + (unitInfo.hp - 100),
+      speed: raceInfo.speed,
+      atk: raceInfo.atk + (unitInfo.atk - 10),
+      range: unitInfo.range,
+      isNaval: unitInfo.isNaval
+    };
+
     this.hp = this.stats.hp;
     this.maxHp = this.hp;
     this.isNaval = this.stats.isNaval;
@@ -53,6 +69,12 @@ class Unit {
 
     if (this.attackTarget) {
       if (this.attackTarget.hp <= 0) {
+        this.kills++;
+        if (this.kills % 3 === 0) {
+          this.level++;
+          this.maxHp += 15;
+          this.hp = Math.min(this.maxHp, this.hp + 15);
+        }
         this.attackTarget = null;
         this.state = 'IDLE';
         return;

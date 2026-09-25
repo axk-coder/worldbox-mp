@@ -15,9 +15,10 @@ class Building {
 }
 
 class Town {
-  constructor(id, name, x, y, ownerId, kingdomKey = 'blue') {
+  constructor(id, name, raceKey, x, y, ownerId, kingdomKey = 'blue') {
     this.id = id;
     this.name = name;
+    this.raceKey = raceKey || 'HUMAN';
     this.x = x;
     this.y = y;
     this.ownerId = ownerId;
@@ -64,7 +65,7 @@ class Town {
       const houses = this.buildings.filter(b => b.type === 'HOUSE').length;
       if (houses * 4 > gameState.getTownUnitsCount(this.id)) {
         this.resources.food -= 15;
-        gameState.spawnUnit('WORKER', this.x + (Math.random() > 0.5 ? 1 : -1), this.y + (Math.random() > 0.5 ? 1 : -1), this.ownerId, this.kingdomKey, this.id);
+        gameState.spawnUnit('WORKER', this.raceKey, this.x + (Math.random() > 0.5 ? 1 : -1), this.y + (Math.random() > 0.5 ? 1 : -1), this.ownerId, this.kingdomKey, this.id);
       }
     }
 
@@ -74,14 +75,14 @@ class Town {
       this.resources.wood -= 10;
       const unitType = Math.random() > 0.4 ? 'INFANTRY' : 'ARCHER';
       const b = barracks[Math.floor(Math.random() * barracks.length)];
-      gameState.spawnUnit(unitType, b.x, b.y, this.ownerId, this.kingdomKey, this.id);
+      gameState.spawnUnit(unitType, this.raceKey, b.x, b.y, this.ownerId, this.kingdomKey, this.id);
     }
 
     const docks = this.buildings.filter(b => b.type === 'DOCK');
     if (docks.length > 0 && this.resources.wood >= 50 && Math.random() < 0.03) {
       this.resources.wood -= 50;
       const dock = docks[Math.floor(Math.random() * docks.length)];
-      gameState.spawnUnit('BOAT_CANNON', dock.x, dock.y, this.ownerId, this.kingdomKey, this.id);
+      gameState.spawnUnit('BOAT_CANNON', this.raceKey, dock.x, dock.y, this.ownerId, this.kingdomKey, this.id);
     }
 
     if (this.resources.wood >= 30 && Math.random() < 0.04 && this.buildings.length < 15) {
