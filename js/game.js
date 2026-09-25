@@ -33,12 +33,14 @@ class GameEngine {
 
   initClouds() {
     this.clouds = [];
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 22; i++) {
       this.clouds.push({
         x: Math.random() * 2400,
         y: Math.random() * 2400,
         scale: 0.8 + Math.random() * 0.8,
-        speed: 0.3 + Math.random() * 0.4
+        speed: 0.3 + Math.random() * 0.4,
+        isRaining: Math.random() < 0.3,
+        rainTimer: Math.floor(Math.random() * 300)
       });
     }
   }
@@ -331,6 +333,29 @@ class GameEngine {
         c.y += c.speed * 0.3;
         if (c.x > 2600) c.x = -300;
         if (c.y > 2600) c.y = -300;
+
+        c.rainTimer++;
+        if (c.rainTimer > 250) {
+          c.rainTimer = 0;
+          c.isRaining = !c.isRaining;
+        }
+
+        if (c.isRaining && Math.random() < 0.15) {
+          const worldPos = this.screenToWorld(
+            (c.x * (this.camera.zoom * 0.5)) - (this.camera.x * 0.3),
+            (c.y * (this.camera.zoom * 0.5)) - (this.camera.y * 0.3)
+          );
+          const rx = Math.floor(worldPos.x);
+          const ry = Math.floor(worldPos.y);
+          const tile = this.world.getTile(rx, ry);
+
+          if (tile === CONFIG.TILES.GRASS && Math.random() < 0.15) {
+            this.world.setTile(rx, ry, CONFIG.TILES.FOREST);
+            this.world.resources[ry * this.world.width + rx] = { type: CONFIG.RESOURCES.WOOD, amount: 150 };
+          } else if (tile === CONFIG.TILES.CRATER) {
+            this.world.setTile(rx, ry, CONFIG.TILES.GRASS);
+          }
+        }
       });
     }
   }
@@ -430,18 +455,31 @@ class GameEngine {
   }
 
   renderScrollingClouds(tileSize) {
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
     this.clouds.forEach(c => {
       const sx = (c.x * (this.camera.zoom * 0.5)) - (this.camera.x * 0.3);
       const sy = (c.y * (this.camera.zoom * 0.5)) - (this.camera.y * 0.3);
       const cloudW = 120 * c.scale * this.camera.zoom;
       const cloudH = 45 * c.scale * this.camera.zoom;
 
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
       this.ctx.beginPath();
       this.ctx.ellipse(sx, sy, cloudW * 0.5, cloudH * 0.5, 0, 0, Math.PI * 2);
       this.ctx.ellipse(sx + cloudW * 0.25, sy - cloudH * 0.15, cloudW * 0.35, cloudH * 0.4, 0, 0, Math.PI * 2);
       this.ctx.ellipse(sx - cloudW * 0.25, sy + cloudH * 0.1, cloudW * 0.3, cloudH * 0.35, 0, 0, Math.PI * 2);
       this.ctx.fill();
+
+      if (c.isRaining) {
+        this.ctx.strokeStyle = 'rgba(100, 180, 255, 0.4)';
+        this.ctx.lineWidth = 1;
+        for (let i = 0; i < 6; i++) {
+          const rx = sx + (Math.random() - 0.5) * cloudW;
+          const ry = sy + cloudH * 0.2;
+          this.ctx.beginPath();
+          this.ctx.moveTo(rx, ry);
+          this.ctx.lineTo(rx - 2, ry + 18);
+          this.ctx.stroke();
+        }
+      }
     });
   }
 
