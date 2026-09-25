@@ -465,29 +465,27 @@ class GameEngine {
   }
 
   renderScrollingClouds(tileSize) {
-    this.clouds.forEach(c => {
-      const sx = (c.x * (this.camera.zoom * 0.5)) - (this.camera.x * 0.3);
-      const sy = (c.y * (this.camera.zoom * 0.5)) - (this.camera.y * 0.3);
-      const cloudW = 120 * c.scale * this.camera.zoom;
-      const cloudH = 45 * c.scale * this.camera.zoom;
+    const pw = 8 * this.camera.zoom;
 
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
-      this.ctx.beginPath();
-      this.ctx.ellipse(sx, sy, cloudW * 0.5, cloudH * 0.5, 0, 0, Math.PI * 2);
-      this.ctx.ellipse(sx + cloudW * 0.25, sy - cloudH * 0.15, cloudW * 0.35, cloudH * 0.4, 0, 0, Math.PI * 2);
-      this.ctx.ellipse(sx - cloudW * 0.25, sy + cloudH * 0.1, cloudW * 0.3, cloudH * 0.35, 0, 0, Math.PI * 2);
-      this.ctx.fill();
+    this.clouds.forEach(c => {
+      const sx = Math.floor((c.x * (this.camera.zoom * 0.5)) - (this.camera.x * 0.3));
+      const sy = Math.floor((c.y * (this.camera.zoom * 0.5)) - (this.camera.y * 0.3));
+
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
+      this.ctx.fillRect(sx + pw * 2, sy, pw * 6, pw * 2);
+      this.ctx.fillRect(sx + pw, sy + pw * 2, pw * 8, pw * 2);
+      this.ctx.fillRect(sx, sy + pw * 4, pw * 10, pw * 2);
+
+      this.ctx.fillStyle = 'rgba(203, 213, 225, 0.38)';
+      this.ctx.fillRect(sx, sy + pw * 6, pw * 10, pw);
+      this.ctx.fillRect(sx + pw, sy + pw * 7, pw * 8, pw);
 
       if (c.isRaining) {
-        this.ctx.strokeStyle = 'rgba(100, 180, 255, 0.4)';
-        this.ctx.lineWidth = 1;
-        for (let i = 0; i < 6; i++) {
-          const rx = sx + (Math.random() - 0.5) * cloudW;
-          const ry = sy + cloudH * 0.2;
-          this.ctx.beginPath();
-          this.ctx.moveTo(rx, ry);
-          this.ctx.lineTo(rx - 2, ry + 18);
-          this.ctx.stroke();
+        this.ctx.fillStyle = 'rgba(96, 165, 250, 0.6)';
+        for (let i = 0; i < 4; i++) {
+          const rx = sx + (i * 2 + 1) * pw;
+          const ry = sy + pw * 8 + (Math.floor(Date.now() / 100 + i) % 3) * 6;
+          this.ctx.fillRect(rx, ry, 2, 6);
         }
       }
     });
