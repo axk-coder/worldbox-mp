@@ -1,10 +1,11 @@
 class Building {
-  constructor(id, type, x, y, ownerId) {
+  constructor(id, type, x, y, ownerId, kingdomKey = 'blue') {
     this.id = id;
     this.type = type;
     this.x = x;
     this.y = y;
     this.ownerId = ownerId;
+    this.kingdomKey = kingdomKey;
     this.stats = CONFIG.BUILDINGS[type];
     this.hp = this.stats ? this.stats.hp : 100;
     this.maxHp = this.hp;
@@ -14,23 +15,24 @@ class Building {
 }
 
 class Town {
-  constructor(id, name, x, y, ownerId) {
+  constructor(id, name, x, y, ownerId, kingdomKey = 'blue') {
     this.id = id;
     this.name = name;
     this.x = x;
     this.y = y;
     this.ownerId = ownerId;
+    this.kingdomKey = kingdomKey;
     this.buildings = [];
-    this.resources = { wood: 100, stone: 50, gold: 50, food: 100 };
+    this.resources = { wood: 150, stone: 80, gold: 80, food: 150 };
     this.territory = new Set();
     this.level = 1;
     this.addBuilding('TOWN_HALL', x, y);
-    this.expandTerritory(x, y, 5);
+    this.expandTerritory(x, y, 6);
   }
 
   addBuilding(type, x, y) {
     const bId = `b_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-    const b = new Building(bId, type, x, y, this.ownerId);
+    const b = new Building(bId, type, x, y, this.ownerId, this.kingdomKey);
     this.buildings.push(b);
     return b;
   }
@@ -39,38 +41,50 @@ class Town {
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
         if (Math.hypot(dx, dy) <= radius) {
-          this.territory.add(`${cx + dx},${cy + dy}`);
+          const tx = cx + dx;
+          const ty = cy + dy;
+          if (tx >= 0 && tx < CONFIG.WORLD_WIDTH && ty >= 0 && ty < CONFIG.WORLD_HEIGHT) {
+            this.territory.add(`${tx},${ty}`);
+          }
         }
       }
     }
   }
 
   update(world, gameState) {
-    if (this.resources.food > 20 && Math.random() < 0.05) {
+    this.territory.forEach(key => {
+      const [tx, ty] = key.split(',').map(Number);
+      const idx = ty * world.width + tx;
+      if (world.tiles[idx] !== CONFIG.TILES.DEEP_WATER && world.tiles[idx] !== CONFIG.TILES.SHALLOW_WATER) {
+        world.kingdomOwner[idx] = this.kingdomKey;
+      }
+    });
+
+    if (this.resources.food > 20 && Math.random() < 0.08) {
       const houses = this.buildings.filter(b => b.type === 'HOUSE').length;
-      if (houses * 3 > gameState.getTownUnitsCount(this.id)) {
+      if (houses * 4 > gameState.getTownUnitsCount(this.id)) {
         this.resources.food -= 15;
-        gameState.spawnUnit('WORKER', this.x + (Math.random() > 0.5 ? 1 : -1), this.y + (Math.random() > 0.5 ? 1 : -1), this.ownerId, this.id);
+        gameState.spawnUnit('WORKER', this.x + (Math.random() > 0.5 ? 1 : -1), this.y + (Math.random() > 0.5 ? 1 : -1), this.ownerId, this.kingdomKey, this.id);
       }
     }
 
     const barracks = this.buildings.filter(b => b.type === 'BARRACKS');
-    if (barracks.length > 0 && this.resources.food >= 20 && this.resources.wood >= 10 && Math.random() < 0.04) {
+    if (barracks.length > 0 && this.resources.food >= 20 && this.resources.wood >= 10 && Math.random() < 0.06) {
       this.resources.food -= 20;
       this.resources.wood -= 10;
       const unitType = Math.random() > 0.4 ? 'INFANTRY' : 'ARCHER';
       const b = barracks[Math.floor(Math.random() * barracks.length)];
-      gameState.spawnUnit(unitType, b.x, b.y, this.ownerId, this.id);
+      gameState.spawnUnit(unitType, b.x, b.y, this.ownerId, this.kingdomKey, this.id);
     }
 
     const docks = this.buildings.filter(b => b.type === 'DOCK');
-    if (docks.length > 0 && this.resources.wood >= 60 && Math.random() < 0.02) {
-      this.resources.wood -= 60;
+    if (docks.length > 0 && this.resources.wood >= 50 && Math.random() < 0.03) {
+      this.resources.wood -= 50;
       const dock = docks[Math.floor(Math.random() * docks.length)];
-      gameState.spawnUnit('BOAT_CANNON', dock.x, dock.y, this.ownerId, this.id);
+      gameState.spawnUnit('BOAT_CANNON', dock.x, dock.y, this.ownerId, this.kingdomKey, this.id);
     }
 
-    if (this.resources.wood >= 30 && Math.random() < 0.03 && this.buildings.length < 12) {
+    if (this.resources.wood >= 30 && Math.random() < 0.04 && this.buildings.length < 15) {
       const spot = this.findBuildSpot(world);
       if (spot) {
         let bType = 'HOUSE';
@@ -86,7 +100,7 @@ class Town {
         }
         this.resources.wood -= 20;
         this.addBuilding(bType, spot.x, spot.y);
-        this.expandTerritory(spot.x, spot.y, 2);
+        this.expandTerritory(spot.x, spot.y, 3);
       }
     }
   }
@@ -101,7 +115,7 @@ class Town {
 
   findBuildSpot(world) {
     const arr = Array.from(this.territory);
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 25; i++) {
       const key = arr[Math.floor(Math.random() * arr.length)];
       if (!key) continue;
       const [x, y] = key.split(',').map(Number);

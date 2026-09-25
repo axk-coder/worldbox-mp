@@ -6,44 +6,45 @@ class WorldMap {
     this.heightMap = new Float32Array(width * height);
     this.resources = new Array(width * height).fill(null);
     this.fallout = new Uint8Array(width * height);
+    this.kingdomOwner = new Array(width * height).fill(null);
     this.noise = new SimplexNoise(Math.floor(Math.random() * 999999));
   }
 
   generate(seed = Math.random() * 100000) {
     this.noise.seed(seed);
-    const scale = 0.035;
-    const detailScale = 0.08;
+    const scale = 0.03;
+    const detailScale = 0.07;
 
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
         const idx = y * this.width + x;
         let e = (this.noise.noise2D(x * scale, y * scale) + 1) / 2;
         let detail = (this.noise.noise2D(x * detailScale, y * detailScale) + 1) / 2;
-        let heightVal = e * 0.7 + detail * 0.3;
+        let heightVal = e * 0.65 + detail * 0.35;
 
         let dx = (x - this.width / 2) / (this.width / 2);
         let dy = (y - this.height / 2) / (this.height / 2);
         let dist = Math.sqrt(dx * dx + dy * dy);
-        heightVal = heightVal * (1 - Math.pow(dist, 2.2));
+        heightVal = heightVal * (1 - Math.pow(dist, 2.0));
 
         this.heightMap[idx] = heightVal;
 
-        if (heightVal < 0.22) {
+        if (heightVal < 0.24) {
           this.tiles[idx] = CONFIG.TILES.DEEP_WATER;
-        } else if (heightVal < 0.32) {
+        } else if (heightVal < 0.33) {
           this.tiles[idx] = CONFIG.TILES.SHALLOW_WATER;
-        } else if (heightVal < 0.38) {
+        } else if (heightVal < 0.39) {
           this.tiles[idx] = CONFIG.TILES.SAND;
-        } else if (heightVal < 0.62) {
+        } else if (heightVal < 0.65) {
           this.tiles[idx] = CONFIG.TILES.GRASS;
-          if (Math.random() < 0.18) {
-            this.resources[idx] = { type: CONFIG.RESOURCES.WOOD, amount: 100 };
+          if (Math.random() < 0.22) {
+            this.resources[idx] = { type: CONFIG.RESOURCES.WOOD, amount: 120 };
             this.tiles[idx] = CONFIG.TILES.FOREST;
           }
-        } else if (heightVal < 0.82) {
+        } else if (heightVal < 0.84) {
           this.tiles[idx] = CONFIG.TILES.MOUNTAIN;
-          if (Math.random() < 0.1) {
-            this.resources[idx] = { type: CONFIG.RESOURCES.STONE, amount: 150 };
+          if (Math.random() < 0.12) {
+            this.resources[idx] = { type: CONFIG.RESOURCES.STONE, amount: 180 };
           }
         } else {
           this.tiles[idx] = CONFIG.TILES.SNOW;
@@ -59,7 +60,36 @@ class WorldMap {
 
   setTile(x, y, tileType) {
     if (x < 0 || x >= this.width || y < 0 || y >= this.height) return;
-    this.tiles[y * this.width + x] = tileType;
+    const idx = y * this.width + x;
+    this.tiles[idx] = tileType;
+    if (tileType === CONFIG.TILES.DEEP_WATER || tileType === CONFIG.TILES.SHALLOW_WATER) {
+      this.kingdomOwner[idx] = null;
+    }
+  }
+
+  applyBrush(cx, cy, radius, tool) {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const tx = cx + dx;
+        const ty = cy + dy;
+        if (tx < 0 || tx >= this.width || ty < 0 || ty >= this.height) continue;
+        if (Math.hypot(dx, dy) <= radius) {
+          const idx = ty * this.width + tx;
+          if (tool === 'RAISE_LAND') {
+            this.tiles[idx] = CONFIG.TILES.GRASS;
+          } else if (tool === 'LOWER_LAND') {
+            this.tiles[idx] = CONFIG.TILES.SHALLOW_WATER;
+            this.kingdomOwner[idx] = null;
+          } else if (tool === 'PLANT_FOREST') {
+            this.tiles[idx] = CONFIG.TILES.FOREST;
+            this.resources[idx] = { type: CONFIG.RESOURCES.WOOD, amount: 150 };
+          } else if (tool === 'BUILD_MOUNTAIN') {
+            this.tiles[idx] = CONFIG.TILES.MOUNTAIN;
+            this.resources[idx] = { type: CONFIG.RESOURCES.STONE, amount: 200 };
+          }
+        }
+      }
+    }
   }
 
   getResource(x, y) {
@@ -88,6 +118,7 @@ class WorldMap {
           if (dist <= radius * 0.6) {
             this.tiles[idx] = CONFIG.TILES.CRATER;
             this.resources[idx] = null;
+            this.kingdomOwner[idx] = null;
           } else {
             if (this.tiles[idx] === CONFIG.TILES.FOREST) {
               this.tiles[idx] = CONFIG.TILES.GRASS;
@@ -121,7 +152,7 @@ class WorldMap {
     open.push({ x: startX, y: startY, g: 0, h: Math.hypot(targetX - startX, targetY - startY) });
 
     let iterations = 0;
-    const maxIterations = 400;
+    const maxIterations = 350;
 
     while (open.length > 0 && iterations < maxIterations) {
       iterations++;

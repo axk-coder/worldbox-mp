@@ -1,5 +1,5 @@
 class Unit {
-  constructor(id, type, x, y, ownerId, townId = null) {
+  constructor(id, type, x, y, ownerId, kingdomKey = 'blue', townId = null) {
     this.id = id;
     this.type = type;
     this.x = x;
@@ -7,6 +7,7 @@ class Unit {
     this.targetX = x;
     this.targetY = y;
     this.ownerId = ownerId;
+    this.kingdomKey = kingdomKey;
     this.townId = townId;
     this.stats = CONFIG.UNITS[type] || CONFIG.UNITS.INFANTRY;
     this.hp = this.stats.hp;
@@ -80,7 +81,7 @@ class Unit {
     const res = world.getResource(rx, ry);
     if (res && res.amount > 0) {
       this.harvestTimer++;
-      if (this.harvestTimer >= CONFIG.TICKS_PER_SEC * 2) {
+      if (this.harvestTimer >= CONFIG.TICKS_PER_SEC * 1.5) {
         this.harvestTimer = 0;
         res.amount -= 10;
         const town = gameState.towns.find(t => t.id === this.townId);
@@ -89,8 +90,8 @@ class Unit {
         }
       }
     } else if (this.state === 'IDLE' && Math.random() < 0.1) {
-      for (let dy = -5; dy <= 5; dy++) {
-        for (let dx = -5; dx <= 5; dx++) {
+      for (let dy = -6; dy <= 6; dy++) {
+        for (let dx = -6; dx <= 6; dx++) {
           const nx = rx + dx;
           const ny = ry + dy;
           if (world.getResource(nx, ny)) {
@@ -104,9 +105,9 @@ class Unit {
 
   scanForEnemies(gameState) {
     if (this.state === 'ATTACKING') return;
-    const enemies = gameState.units.filter(u => u.ownerId !== this.ownerId && u.hp > 0);
+    const enemies = gameState.units.filter(u => u.kingdomKey !== this.kingdomKey && u.hp > 0);
     let closest = null;
-    let minDist = 8;
+    let minDist = 10;
     for (let enemy of enemies) {
       const d = Math.hypot(enemy.x - this.x, enemy.y - this.y);
       if (d < minDist) {
