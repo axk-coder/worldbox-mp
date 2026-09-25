@@ -32,6 +32,14 @@ class GameEngine {
     this.newGame();
   }
 
+  generateKingdomName(raceKey) {
+    const prefixes = ['Valoria', 'Ironfang', 'Silverwood', 'Solaria', 'Stonepeak', 'Drakon', 'Thunder', 'Shadow', 'Aethel', 'Grimm'];
+    const suffixes = ['Kingdom', 'Horde', 'Dominion', 'Hold', 'Empire', 'Realm', 'Clan', 'Dynasty'];
+    const p = prefixes[Math.floor(Math.random() * prefixes.length)];
+    const s = suffixes[Math.floor(Math.random() * suffixes.length)];
+    return `${p} ${s}`;
+  }
+
   initClouds() {
     this.clouds = [];
     for (let i = 0; i < 22; i++) {
@@ -77,8 +85,9 @@ class GameEngine {
 
     const raceConfig = CONFIG.RACES[raceKey] || CONFIG.RACES.HUMAN;
     const kingdomKey = raceConfig.kingdomKey;
+    const kingdomName = name || this.generateKingdomName(raceKey);
     const tId = `t_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
-    const town = new Town(tId, name, raceKey, x, y, this.playerId, kingdomKey);
+    const town = new Town(tId, kingdomName, raceKey, x, y, this.playerId, kingdomKey);
     this.towns.push(town);
 
     for (let i = 0; i < 3; i++) {
@@ -95,7 +104,7 @@ class GameEngine {
     if (!townId && !isNaval) {
       let existingTown = this.towns.find(t => t.kingdomKey === kingdomKey && Math.hypot(t.x - x, t.y - y) < 20);
       if (!existingTown) {
-        existingTown = this.spawnKingdom(raceKey, `${raceConfig.name} Colony`, x, y);
+        existingTown = this.spawnKingdom(raceKey, this.generateKingdomName(raceKey), x, y);
       }
       if (existingTown) townId = existingTown.id;
     }
@@ -116,6 +125,20 @@ class GameEngine {
       life: 1.0,
       maxLife: isNuke ? 3.0 : 1.0
     });
+  }
+
+  addChopFx(x, y) {
+    for (let i = 0; i < 3; i++) {
+      this.fx.push({
+        x: x + (Math.random() - 0.5) * 0.6,
+        y: y + (Math.random() - 0.5) * 0.6,
+        radius: 0.15,
+        isChop: true,
+        color: Math.random() > 0.5 ? '#8d6e63' : '#2e7d32',
+        life: 0.4,
+        maxLife: 0.4
+      });
+    }
   }
 
   initMultiplayer() {
@@ -439,11 +462,16 @@ class GameEngine {
     this.fx.forEach(f => {
       const sx = f.x * tileSize - this.camera.x;
       const sy = f.y * tileSize - this.camera.y;
-      const r = f.radius * tileSize * (1 - f.life);
-      this.ctx.fillStyle = f.isNuke ? `rgba(255, 100, 0, ${f.life * 0.7})` : `rgba(255, 235, 59, ${f.life * 0.6})`;
-      this.ctx.beginPath();
-      this.ctx.arc(sx, sy, r, 0, Math.PI * 2);
-      this.ctx.fill();
+      if (f.isChop) {
+        this.ctx.fillStyle = f.color;
+        this.ctx.fillRect(sx, sy, 3, 3);
+      } else {
+        const r = f.radius * tileSize * (1 - f.life);
+        this.ctx.fillStyle = f.isNuke ? `rgba(255, 100, 0, ${f.life * 0.7})` : `rgba(255, 235, 59, ${f.life * 0.6})`;
+        this.ctx.beginPath();
+        this.ctx.arc(sx, sy, r, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
     });
 
     this.renderScrollingClouds(tileSize);

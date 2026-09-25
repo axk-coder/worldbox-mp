@@ -33,6 +33,7 @@ class Unit {
     this.attackTarget = null;
     this.state = 'IDLE';
     this.harvestTimer = 0;
+    this.harvestTargetRes = null;
     this.selected = false;
   }
 
@@ -45,7 +46,10 @@ class Unit {
   }
 
   update(world, gameState) {
-    if (this.hp <= 0) return;
+    if (this.hp <= 0) {
+      this.releaseClaim();
+      return;
+    }
 
     const rx = Math.round(this.x);
     const ry = Math.round(this.y);
@@ -60,6 +64,7 @@ class Unit {
       if (!world.isPassable(nextTile.x, nextTile.y, this.isNaval)) {
         this.path = [];
         this.state = 'IDLE';
+        this.releaseClaim();
         return;
       }
 
@@ -112,6 +117,13 @@ class Unit {
     this.scanForEnemies(gameState);
   }
 
+  releaseClaim() {
+    if (this.harvestTargetRes && this.harvestTargetRes.claimedBy === this.id) {
+      this.harvestTargetRes.claimedBy = null;
+      this.harvestTargetRes = null;
+    }
+  }
+
   updateWorkerAI(world, gameState) {
     const rx = Math.round(this.x);
     const ry = Math.round(this.y);
@@ -120,6 +132,7 @@ class Unit {
     if (town) {
       const unbuilt = town.buildings.find(b => !b.isCompleted);
       if (unbuilt) {
+        this.releaseClaim();
         const dist = Math.hypot(unbuilt.x - this.x, unbuilt.y - this.y);
         if (dist <= 1.2) {
           unbuilt.constructTick(15);
@@ -131,23 +144,41 @@ class Unit {
     }
 
     const res = world.getResource(rx, ry);
-    if (res && res.amount > 0) {
+    if (res && res.amount > 0 && (!res.claimedBy || res.claimedBy === this.id)) {
+      res.claimedBy = this.id;
+      this.harvestTargetRes = res;
       this.harvestTimer++;
+
+      if (this.harvestTimer % 5 === 0) {
+        gameState.addChopFx(rx, ry);
+      }
+
       if (this.harvestTimer >= CONFIG.TICKS_PER_SEC * 1.5) {
         this.harvestTimer = 0;
         res.amount -= 10;
         if (town) {
           town.resources[res.type] = (town.resources[res.type] || 0) + 10;
         }
+        if (res.amount <= 0) {
+          res.claimedBy = null;
+          this.harvestTargetRes = null;
+          world.setTile(rx, ry, CONFIG.TILES.GRASS);
+        }
       }
-    } else if (this.state === 'IDLE' && Math.random() < 0.1) {
-      for (let dy = -6; dy <= 6; dy++) {
-        for (let dx = -6; dx <= 6; dx++) {
-          const nx = rx + dx;
-          const ny = ry + dy;
-          if (world.getResource(nx, ny) && world.isPassable(nx, ny, false)) {
-            this.setMoveTarget(nx, ny, world);
-            return;
+    } else {
+      this.releaseClaim();
+      if (this.state === 'IDLE' && Math.random() < 0.12) {
+        for (let dy = -6; dy <= 6; dy++) {
+          for (let dx = -6; dx <= 6; dx++) {
+            const nx = rx + dx;
+            const ny = ry + dy;
+            const targetRes = world.getResource(nx, ny);
+            if (targetRes && targetRes.amount > 0 && !targetRes.claimedBy && world.isPassable(nx, ny, false)) {
+              targetRes.claimedBy = this.id;
+              this.harvestTargetRes = targetRes;
+              this.setMoveTarget(nx, ny, world);
+              return;
+            }
           }
         }
       }
