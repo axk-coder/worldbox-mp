@@ -7,6 +7,7 @@ class WorldMap {
     this.resources = new Array(width * height).fill(null);
     this.fallout = new Uint8Array(width * height);
     this.kingdomOwner = new Array(width * height).fill(null);
+    this.tileNoise = new Float32Array(width * height);
     this.noise = new SimplexNoise(Math.floor(Math.random() * 999999));
   }
 
@@ -34,6 +35,7 @@ class WorldMap {
         heightVal = heightVal * (1 - Math.pow(dist, 1.8));
 
         this.heightMap[idx] = heightVal;
+        this.tileNoise[idx] = (this.noise.noise2D(x * 0.25, y * 0.25) * 0.08);
 
         if (heightVal < 0.25) {
           this.tiles[idx] = CONFIG.TILES.DEEP_WATER;
@@ -94,6 +96,26 @@ class WorldMap {
             this.resources[idx] = { type: CONFIG.RESOURCES.STONE, amount: 200 };
           }
         }
+      }
+    }
+  }
+
+  updateErosion() {
+    if (Math.random() > 0.08) return;
+    const rx = Math.floor(Math.random() * (this.width - 2)) + 1;
+    const ry = Math.floor(Math.random() * (this.height - 2)) + 1;
+    const idx = ry * this.width + rx;
+
+    if (this.tiles[idx] === CONFIG.TILES.GRASS || this.tiles[idx] === CONFIG.TILES.FOREST) {
+      const neighbors = [
+        this.tiles[(ry - 1) * this.width + rx],
+        this.tiles[(ry + 1) * this.width + rx],
+        this.tiles[ry * this.width + (rx - 1)],
+        this.tiles[ry * this.width + (rx + 1)]
+      ];
+      if (neighbors.some(t => t === CONFIG.TILES.SHALLOW_WATER || t === CONFIG.TILES.DEEP_WATER)) {
+        this.tiles[idx] = CONFIG.TILES.SAND;
+        this.resources[idx] = null;
       }
     }
   }

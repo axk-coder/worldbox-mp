@@ -300,6 +300,7 @@ class GameEngine {
 
     for (let step = 0; step < this.simSpeed; step++) {
       this.world.tickFallout();
+      this.world.updateErosion();
       this.towns.forEach(t => t.update(this.world, this));
       this.units.forEach(u => u.update(this.world, this));
       this.units = this.units.filter(u => u.hp > 0);
@@ -327,7 +328,10 @@ class GameEngine {
         const screenX = x * tileSize - this.camera.x;
         const screenY = y * tileSize - this.camera.y;
 
-        this.ctx.fillStyle = CONFIG.TILE_COLORS[tile] || '#000';
+        const baseColor = CONFIG.TILE_COLORS[tile] || '#000';
+        const heightFactor = Math.max(0.7, Math.min(1.25, 0.75 + this.world.heightMap[idx] * 0.5 + this.world.tileNoise[idx]));
+
+        this.ctx.fillStyle = this.adjustColor(baseColor, heightFactor);
         this.ctx.fillRect(screenX, screenY, tileSize + 0.5, tileSize + 0.5);
 
         const kingdomKey = this.world.kingdomOwner[idx];
@@ -341,6 +345,10 @@ class GameEngine {
           this.ctx.fillStyle = `rgba(140, 230, 80, ${falloutVal / 350})`;
           this.ctx.fillRect(screenX, screenY, tileSize, tileSize);
         }
+
+        if (tile === CONFIG.TILES.FOREST) {
+          this.renderPixelTree(screenX, screenY, tileSize);
+        }
       }
     }
 
@@ -350,12 +358,7 @@ class GameEngine {
       town.buildings.forEach(b => {
         const sx = b.x * tileSize - this.camera.x;
         const sy = b.y * tileSize - this.camera.y;
-
-        this.ctx.fillStyle = kColor;
-        this.ctx.fillRect(sx + 2, sy + 2, tileSize - 4, tileSize - 4);
-        this.ctx.strokeStyle = '#000000';
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeRect(sx + 2, sy + 2, tileSize - 4, tileSize - 4);
+        this.renderPixelBuilding(sx, sy, tileSize, b.type, kColor);
       });
     });
 
@@ -363,40 +366,7 @@ class GameEngine {
       const sx = u.x * tileSize - this.camera.x;
       const sy = u.y * tileSize - this.camera.y;
       const raceColor = CONFIG.RACES[u.raceKey] ? CONFIG.RACES[u.raceKey].color : '#ffffff';
-
-      if (u.isNaval) {
-        this.ctx.fillStyle = '#455a64';
-        this.ctx.beginPath();
-        this.ctx.arc(sx + tileSize / 2, sy + tileSize / 2, tileSize * 0.45, 0, Math.PI * 2);
-        this.ctx.fill();
-
-        this.ctx.fillStyle = raceColor;
-        this.ctx.beginPath();
-        this.ctx.arc(sx + tileSize / 2, sy + tileSize / 2, tileSize * 0.2, 0, Math.PI * 2);
-        this.ctx.fill();
-      } else {
-        this.ctx.fillStyle = raceColor;
-        this.ctx.beginPath();
-        this.ctx.arc(sx + tileSize / 2, sy + tileSize / 2, tileSize * 0.35, 0, Math.PI * 2);
-        this.ctx.fill();
-
-        this.ctx.strokeStyle = '#000';
-        this.ctx.lineWidth = 1;
-        this.ctx.stroke();
-      }
-
-      if (u.selected) {
-        this.ctx.strokeStyle = '#ffffff';
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(sx - 1, sy - 1, tileSize + 2, tileSize + 2);
-      }
-
-      if (u.hp < u.maxHp) {
-        this.ctx.fillStyle = '#111';
-        this.ctx.fillRect(sx, sy - 4, tileSize, 3);
-        this.ctx.fillStyle = '#00e676';
-        this.ctx.fillRect(sx, sy - 4, tileSize * (u.hp / u.maxHp), 3);
-      }
+      this.renderPixelCreature(sx, sy, tileSize, u, raceColor);
     });
 
     this.projectiles.forEach(p => {
@@ -431,6 +401,93 @@ class GameEngine {
       this.ctx.setLineDash([]);
       this.ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
       this.ctx.fillRect(sx, sy, w, h);
+    }
+  }
+
+  adjustColor(hex, factor) {
+    let r = parseInt(hex.substr(1, 2), 16);
+    let g = parseInt(hex.substr(3, 2), 16);
+    let b = parseInt(hex.substr(5, 2), 16);
+
+    r = Math.min(255, Math.max(0, Math.round(r * factor)));
+    g = Math.min(255, Math.max(0, Math.round(g * factor)));
+    b = Math.min(255, Math.max(0, Math.round(b * factor)));
+
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  }
+
+  renderPixelTree(sx, sy, size) {
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    this.ctx.beginPath();
+    this.ctx.ellipse(sx + size / 2, sy + size * 0.85, size * 0.35, size * 0.15, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    this.ctx.fillStyle = '#5d4037';
+    this.ctx.fillRect(sx + size * 0.4, sy + size * 0.5, size * 0.2, size * 0.4);
+
+    this.ctx.fillStyle = '#1b5e20';
+    this.ctx.beginPath();
+    this.ctx.arc(sx + size / 2, sy + size * 0.4, size * 0.35, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    this.ctx.fillStyle = '#2e7d32';
+    this.ctx.beginPath();
+    this.ctx.arc(sx + size * 0.4, sy + size * 0.3, size * 0.2, 0, Math.PI * 2);
+    this.ctx.fill();
+  }
+
+  renderPixelBuilding(sx, sy, size, type, kColor) {
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    this.ctx.fillRect(sx + 3, sy + size * 0.7, size - 4, size * 0.25);
+
+    this.ctx.fillStyle = '#424242';
+    this.ctx.fillRect(sx + 2, sy + 4, size - 4, size - 6);
+
+    this.ctx.fillStyle = kColor;
+    this.ctx.beginPath();
+    this.ctx.moveTo(sx + size / 2, sy);
+    this.ctx.lineTo(sx + 1, sy + size * 0.4);
+    this.ctx.lineTo(sx + size - 1, sy + size * 0.4);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    this.ctx.fillStyle = '#111111';
+    this.ctx.fillRect(sx + size * 0.4, sy + size * 0.6, size * 0.2, size * 0.35);
+  }
+
+  renderPixelCreature(sx, sy, size, u, raceColor) {
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    this.ctx.beginPath();
+    this.ctx.ellipse(sx + size / 2, sy + size * 0.8, size * 0.3, size * 0.12, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    if (u.isNaval) {
+      this.ctx.fillStyle = '#37474f';
+      this.ctx.fillRect(sx + 2, sy + size * 0.3, size - 4, size * 0.4);
+      this.ctx.fillStyle = raceColor;
+      this.ctx.fillRect(sx + size * 0.35, sy + size * 0.1, size * 0.3, size * 0.25);
+    } else {
+      this.ctx.fillStyle = raceColor;
+      this.ctx.fillRect(sx + size * 0.3, sy + size * 0.35, size * 0.4, size * 0.4);
+
+      this.ctx.fillStyle = '#ffe0b2';
+      this.ctx.fillRect(sx + size * 0.35, sy + size * 0.15, size * 0.3, size * 0.25);
+
+      this.ctx.fillStyle = '#212121';
+      this.ctx.fillRect(sx + size * 0.7, sy + size * 0.4, size * 0.15, size * 0.3);
+    }
+
+    if (u.selected) {
+      this.ctx.strokeStyle = '#ffffff';
+      this.ctx.lineWidth = 1.5;
+      this.ctx.strokeRect(sx, sy, size, size);
+    }
+
+    if (u.hp < u.maxHp) {
+      this.ctx.fillStyle = '#000';
+      this.ctx.fillRect(sx, sy - 4, size, 3);
+      this.ctx.fillStyle = '#00e676';
+      this.ctx.fillRect(sx, sy - 4, size * (u.hp / u.maxHp), 3);
     }
   }
 

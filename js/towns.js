@@ -27,6 +27,8 @@ class Town {
     this.resources = { wood: 150, stone: 80, gold: 80, food: 150 };
     this.territory = new Set();
     this.level = 1;
+    this.leader = null;
+    this.electionTimer = 0;
     this.addBuilding('TOWN_HALL', x, y);
     this.expandTerritory(x, y, 6);
   }
@@ -52,6 +54,25 @@ class Town {
     }
   }
 
+  holdElection(gameState) {
+    const members = gameState.units.filter(u => u.townId === this.id && u.hp > 0);
+    if (members.length === 0) {
+      this.leader = null;
+      return;
+    }
+    members.sort((a, b) => b.level - a.level || b.kills - a.kills);
+    this.leader = members[0];
+  }
+
+  tradeWithOtherTowns(gameState) {
+    const partner = gameState.towns.find(t => t.id !== this.id && t.kingdomKey !== this.kingdomKey);
+    if (partner && partner.resources.food < 50 && this.resources.food > 100) {
+      this.resources.food -= 20;
+      partner.resources.food += 20;
+      this.resources.gold += 10;
+    }
+  }
+
   update(world, gameState) {
     this.territory.forEach(key => {
       const [tx, ty] = key.split(',').map(Number);
@@ -60,6 +81,13 @@ class Town {
         world.kingdomOwner[idx] = this.kingdomKey;
       }
     });
+
+    this.electionTimer++;
+    if (this.electionTimer >= CONFIG.TICKS_PER_SEC * 10) {
+      this.electionTimer = 0;
+      this.holdElection(gameState);
+      this.tradeWithOtherTowns(gameState);
+    }
 
     if (this.resources.food > 20 && Math.random() < 0.08) {
       const houses = this.buildings.filter(b => b.type === 'HOUSE').length;
