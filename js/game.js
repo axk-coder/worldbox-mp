@@ -16,6 +16,10 @@ class GameEngine {
     this.selectedUnits = [];
     this.simSpeed = 1;
 
+    this.cloudOffset = { x: 0, y: 0 };
+    this.clouds = [];
+    this.initClouds();
+
     this.dragStart = null;
     this.currentMousePos = { x: 0, y: 0 };
     this.isMouseDown = false;
@@ -25,6 +29,18 @@ class GameEngine {
     this.initEvents();
     this.initMultiplayer();
     this.newGame();
+  }
+
+  initClouds() {
+    this.clouds = [];
+    for (let i = 0; i < 20; i++) {
+      this.clouds.push({
+        x: Math.random() * 2400,
+        y: Math.random() * 2400,
+        scale: 0.8 + Math.random() * 0.8,
+        speed: 0.3 + Math.random() * 0.4
+      });
+    }
   }
 
   initCanvas() {
@@ -309,6 +325,13 @@ class GameEngine {
 
       this.fx.forEach(f => f.life -= 1 / (CONFIG.TICKS_PER_SEC * f.maxLife));
       this.fx = this.fx.filter(f => f.life > 0);
+
+      this.clouds.forEach(c => {
+        c.x += c.speed;
+        c.y += c.speed * 0.3;
+        if (c.x > 2600) c.x = -300;
+        if (c.y > 2600) c.y = -300;
+      });
     }
   }
 
@@ -388,6 +411,8 @@ class GameEngine {
       this.ctx.fill();
     });
 
+    this.renderScrollingClouds(tileSize);
+
     if (this.isMouseDown && this.activeTool === 'SELECT' && this.dragStart && !this.isRightDrag) {
       const sx = Math.min(this.dragStart.x, this.currentMousePos.x);
       const sy = Math.min(this.dragStart.y, this.currentMousePos.y);
@@ -402,6 +427,22 @@ class GameEngine {
       this.ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
       this.ctx.fillRect(sx, sy, w, h);
     }
+  }
+
+  renderScrollingClouds(tileSize) {
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+    this.clouds.forEach(c => {
+      const sx = (c.x * (this.camera.zoom * 0.5)) - (this.camera.x * 0.3);
+      const sy = (c.y * (this.camera.zoom * 0.5)) - (this.camera.y * 0.3);
+      const cloudW = 120 * c.scale * this.camera.zoom;
+      const cloudH = 45 * c.scale * this.camera.zoom;
+
+      this.ctx.beginPath();
+      this.ctx.ellipse(sx, sy, cloudW * 0.5, cloudH * 0.5, 0, 0, Math.PI * 2);
+      this.ctx.ellipse(sx + cloudW * 0.25, sy - cloudH * 0.15, cloudW * 0.35, cloudH * 0.4, 0, 0, Math.PI * 2);
+      this.ctx.ellipse(sx - cloudW * 0.25, sy + cloudH * 0.1, cloudW * 0.3, cloudH * 0.35, 0, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
   }
 
   adjustColor(hex, factor) {
