@@ -120,6 +120,26 @@ class WorldMap {
     }
   }
 
+  updateWaterFlow() {
+    if (Math.random() > 0.12) return;
+    const rx = Math.floor(Math.random() * (this.width - 2)) + 1;
+    const ry = Math.floor(Math.random() * (this.height - 2)) + 1;
+    const idx = ry * this.width + rx;
+
+    if (this.tiles[idx] === CONFIG.TILES.CRATER) {
+      const neighbors = [
+        this.tiles[(ry - 1) * this.width + rx],
+        this.tiles[(ry + 1) * this.width + rx],
+        this.tiles[ry * this.width + (rx - 1)],
+        this.tiles[ry * this.width + (rx + 1)]
+      ];
+      if (neighbors.some(t => t === CONFIG.TILES.SHALLOW_WATER || t === CONFIG.TILES.DEEP_WATER)) {
+        this.tiles[idx] = CONFIG.TILES.SHALLOW_WATER;
+        this.kingdomOwner[idx] = null;
+      }
+    }
+  }
+
   getResource(x, y) {
     if (x < 0 || x >= this.width || y < 0 || y >= this.height) return null;
     return this.resources[y * this.width + x];

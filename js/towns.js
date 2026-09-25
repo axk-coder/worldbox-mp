@@ -9,8 +9,17 @@ class Building {
     this.stats = CONFIG.BUILDINGS[type];
     this.hp = this.stats ? this.stats.hp : 100;
     this.maxHp = this.hp;
-    this.isCompleted = true;
-    this.progress = 100;
+    this.isCompleted = type === 'TOWN_HALL';
+    this.progress = type === 'TOWN_HALL' ? 100 : 0;
+  }
+
+  constructTick(amount = 15) {
+    if (this.isCompleted) return;
+    this.progress += amount;
+    if (this.progress >= 100) {
+      this.progress = 100;
+      this.isCompleted = true;
+    }
   }
 }
 
@@ -89,15 +98,15 @@ class Town {
       this.tradeWithOtherTowns(gameState);
     }
 
+    const completedHouses = this.buildings.filter(b => b.type === 'HOUSE' && b.isCompleted).length;
     if (this.resources.food > 20 && Math.random() < 0.08) {
-      const houses = this.buildings.filter(b => b.type === 'HOUSE').length;
-      if (houses * 4 > gameState.getTownUnitsCount(this.id)) {
+      if (completedHouses * 4 > gameState.getTownUnitsCount(this.id)) {
         this.resources.food -= 15;
         gameState.spawnUnit('WORKER', this.raceKey, this.x + (Math.random() > 0.5 ? 1 : -1), this.y + (Math.random() > 0.5 ? 1 : -1), this.ownerId, this.kingdomKey, this.id);
       }
     }
 
-    const barracks = this.buildings.filter(b => b.type === 'BARRACKS');
+    const barracks = this.buildings.filter(b => b.type === 'BARRACKS' && b.isCompleted);
     if (barracks.length > 0 && this.resources.food >= 20 && this.resources.wood >= 10 && Math.random() < 0.06) {
       this.resources.food -= 20;
       this.resources.wood -= 10;
@@ -106,7 +115,7 @@ class Town {
       gameState.spawnUnit(unitType, this.raceKey, b.x, b.y, this.ownerId, this.kingdomKey, this.id);
     }
 
-    const docks = this.buildings.filter(b => b.type === 'DOCK');
+    const docks = this.buildings.filter(b => b.type === 'DOCK' && b.isCompleted);
     if (docks.length > 0 && this.resources.wood >= 50 && Math.random() < 0.03) {
       this.resources.wood -= 50;
       const dock = docks[Math.floor(Math.random() * docks.length)];
@@ -114,22 +123,25 @@ class Town {
     }
 
     if (this.resources.wood >= 30 && Math.random() < 0.04 && this.buildings.length < 15) {
-      const spot = this.findBuildSpot(world);
-      if (spot) {
-        let bType = 'HOUSE';
-        const houseCount = this.buildings.filter(b => b.type === 'HOUSE').length;
-        const barracksCount = this.buildings.filter(b => b.type === 'BARRACKS').length;
-        const dockCount = this.buildings.filter(b => b.type === 'DOCK').length;
+      const unbuilt = this.buildings.some(b => !b.isCompleted);
+      if (!unbuilt) {
+        const spot = this.findBuildSpot(world);
+        if (spot) {
+          let bType = 'HOUSE';
+          const houseCount = this.buildings.filter(b => b.type === 'HOUSE').length;
+          const barracksCount = this.buildings.filter(b => b.type === 'BARRACKS').length;
+          const dockCount = this.buildings.filter(b => b.type === 'DOCK').length;
 
-        if (houseCount >= 2 && barracksCount === 0 && this.resources.stone >= 30) {
-          bType = 'BARRACKS';
-          this.resources.stone -= 30;
-        } else if (this.isNearWater(spot.x, spot.y, world) && dockCount === 0) {
-          bType = 'DOCK';
+          if (houseCount >= 2 && barracksCount === 0 && this.resources.stone >= 30) {
+            bType = 'BARRACKS';
+            this.resources.stone -= 30;
+          } else if (this.isNearWater(spot.x, spot.y, world) && dockCount === 0) {
+            bType = 'DOCK';
+          }
+          this.resources.wood -= 20;
+          this.addBuilding(bType, spot.x, spot.y);
+          this.expandTerritory(spot.x, spot.y, 3);
         }
-        this.resources.wood -= 20;
-        this.addBuilding(bType, spot.x, spot.y);
-        this.expandTerritory(spot.x, spot.y, 3);
       }
     }
   }

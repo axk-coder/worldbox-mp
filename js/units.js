@@ -115,13 +115,27 @@ class Unit {
   updateWorkerAI(world, gameState) {
     const rx = Math.round(this.x);
     const ry = Math.round(this.y);
+    const town = gameState.towns.find(t => t.id === this.townId);
+
+    if (town) {
+      const unbuilt = town.buildings.find(b => !b.isCompleted);
+      if (unbuilt) {
+        const dist = Math.hypot(unbuilt.x - this.x, unbuilt.y - this.y);
+        if (dist <= 1.2) {
+          unbuilt.constructTick(15);
+        } else if (this.state === 'IDLE' || Math.random() < 0.06) {
+          this.setMoveTarget(unbuilt.x, unbuilt.y, world);
+        }
+        return;
+      }
+    }
+
     const res = world.getResource(rx, ry);
     if (res && res.amount > 0) {
       this.harvestTimer++;
       if (this.harvestTimer >= CONFIG.TICKS_PER_SEC * 1.5) {
         this.harvestTimer = 0;
         res.amount -= 10;
-        const town = gameState.towns.find(t => t.id === this.townId);
         if (town) {
           town.resources[res.type] = (town.resources[res.type] || 0) + 10;
         }

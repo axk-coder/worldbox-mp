@@ -15,6 +15,7 @@ class GameEngine {
     this.activeTool = 'INSPECT';
     this.selectedUnits = [];
     this.simSpeed = 1;
+    this.waterPhase = 0;
 
     this.cloudOffset = { x: 0, y: 0 };
     this.clouds = [];
@@ -317,8 +318,11 @@ class GameEngine {
     if (this.simSpeed === 0) return;
 
     for (let step = 0; step < this.simSpeed; step++) {
+      this.waterPhase += 0.05;
       this.world.tickFallout();
       this.world.updateErosion();
+      this.world.updateWaterFlow();
+
       this.towns.forEach(t => t.update(this.world, this));
       this.units.forEach(u => u.update(this.world, this));
       this.units = this.units.filter(u => u.hp > 0);
@@ -382,6 +386,12 @@ class GameEngine {
         this.ctx.fillStyle = this.adjustColor(baseColor, heightFactor);
         this.ctx.fillRect(screenX, screenY, tileSize + 0.5, tileSize + 0.5);
 
+        if (tile === CONFIG.TILES.DEEP_WATER || tile === CONFIG.TILES.SHALLOW_WATER) {
+          const ripple = Math.sin(x * 0.4 + y * 0.4 + this.waterPhase) * 0.08 + 0.08;
+          this.ctx.fillStyle = `rgba(255, 255, 255, ${ripple})`;
+          this.ctx.fillRect(screenX, screenY, tileSize, tileSize);
+        }
+
         const kingdomKey = this.world.kingdomOwner[idx];
         if (kingdomKey && CONFIG.KINGDOM_COLORS[kingdomKey]) {
           this.ctx.fillStyle = CONFIG.KINGDOM_COLORS[kingdomKey].border;
@@ -406,7 +416,7 @@ class GameEngine {
       town.buildings.forEach(b => {
         const sx = b.x * tileSize - this.camera.x;
         const sy = b.y * tileSize - this.camera.y;
-        this.renderPixelBuilding(sx, sy, tileSize, b.type, kColor);
+        this.renderPixelBuilding(sx, sy, tileSize, b, kColor);
       });
     });
 
@@ -515,7 +525,19 @@ class GameEngine {
     this.ctx.fill();
   }
 
-  renderPixelBuilding(sx, sy, size, type, kColor) {
+  renderPixelBuilding(sx, sy, size, building, kColor) {
+    if (!building.isCompleted) {
+      this.ctx.strokeStyle = '#8d6e63';
+      this.ctx.lineWidth = 1.5;
+      this.ctx.strokeRect(sx + 2, sy + 4, size - 4, size - 6);
+
+      this.ctx.fillStyle = '#111111';
+      this.ctx.fillRect(sx, sy - 5, size, 4);
+      this.ctx.fillStyle = '#3b82f6';
+      this.ctx.fillRect(sx, sy - 5, size * (building.progress / 100), 4);
+      return;
+    }
+
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
     this.ctx.fillRect(sx + 3, sy + size * 0.7, size - 4, size * 0.25);
 
