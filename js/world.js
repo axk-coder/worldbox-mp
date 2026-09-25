@@ -10,10 +10,16 @@ class WorldMap {
     this.noise = new SimplexNoise(Math.floor(Math.random() * 999999));
   }
 
-  generate(seed = Math.random() * 100000) {
+  generate(seed = Math.floor(Math.random() * 9999999)) {
     this.noise.seed(seed);
-    const scale = 0.03;
-    const detailScale = 0.07;
+    this.tiles.fill(0);
+    this.heightMap.fill(0);
+    this.resources.fill(null);
+    this.fallout.fill(0);
+    this.kingdomOwner.fill(null);
+
+    const scale = 0.025 + Math.random() * 0.02;
+    const detailScale = 0.06 + Math.random() * 0.03;
 
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
@@ -25,26 +31,26 @@ class WorldMap {
         let dx = (x - this.width / 2) / (this.width / 2);
         let dy = (y - this.height / 2) / (this.height / 2);
         let dist = Math.sqrt(dx * dx + dy * dy);
-        heightVal = heightVal * (1 - Math.pow(dist, 2.0));
+        heightVal = heightVal * (1 - Math.pow(dist, 1.8));
 
         this.heightMap[idx] = heightVal;
 
-        if (heightVal < 0.24) {
+        if (heightVal < 0.25) {
           this.tiles[idx] = CONFIG.TILES.DEEP_WATER;
-        } else if (heightVal < 0.33) {
+        } else if (heightVal < 0.34) {
           this.tiles[idx] = CONFIG.TILES.SHALLOW_WATER;
-        } else if (heightVal < 0.39) {
+        } else if (heightVal < 0.40) {
           this.tiles[idx] = CONFIG.TILES.SAND;
-        } else if (heightVal < 0.65) {
+        } else if (heightVal < 0.68) {
           this.tiles[idx] = CONFIG.TILES.GRASS;
-          if (Math.random() < 0.22) {
-            this.resources[idx] = { type: CONFIG.RESOURCES.WOOD, amount: 120 };
+          if (Math.random() < 0.2) {
+            this.resources[idx] = { type: CONFIG.RESOURCES.WOOD, amount: 150 };
             this.tiles[idx] = CONFIG.TILES.FOREST;
           }
-        } else if (heightVal < 0.84) {
+        } else if (heightVal < 0.85) {
           this.tiles[idx] = CONFIG.TILES.MOUNTAIN;
           if (Math.random() < 0.12) {
-            this.resources[idx] = { type: CONFIG.RESOURCES.STONE, amount: 180 };
+            this.resources[idx] = { type: CONFIG.RESOURCES.STONE, amount: 200 };
           }
         } else {
           this.tiles[idx] = CONFIG.TILES.SNOW;
@@ -103,7 +109,7 @@ class WorldMap {
     if (isNaval) {
       return tile === CONFIG.TILES.DEEP_WATER || tile === CONFIG.TILES.SHALLOW_WATER;
     }
-    return tile !== CONFIG.TILES.DEEP_WATER && tile !== CONFIG.TILES.SHALLOW_WATER && tile !== CONFIG.TILES.SNOW;
+    return tile !== CONFIG.TILES.DEEP_WATER && tile !== CONFIG.TILES.SHALLOW_WATER && tile !== CONFIG.TILES.SNOW && tile !== CONFIG.TILES.CRATER;
   }
 
   applyExplosion(cx, cy, radius, isNuke = false) {

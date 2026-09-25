@@ -38,16 +38,12 @@ class GameEngine {
   }
 
   newGame() {
-    this.world.generate();
+    const freshSeed = Math.floor(Math.random() * 9999999);
+    this.world.generate(freshSeed);
     this.towns = [];
     this.units = [];
     this.projectiles = [];
     this.fx = [];
-
-    this.spawnKingdom('HUMAN', 'Human Realm', 30, 30);
-    this.spawnKingdom('ORC', 'Orc Horde', 130, 130);
-    this.spawnKingdom('ELF', 'Elven Dominion', 30, 130);
-    this.spawnKingdom('DWARF', 'Dwarven Hold', 130, 30);
 
     this.centerCameraOn(80, 80);
   }
@@ -58,25 +54,33 @@ class GameEngine {
   }
 
   spawnKingdom(raceKey, name, x, y) {
+    if (!this.world.isPassable(x, y, false)) return null;
+
     const raceConfig = CONFIG.RACES[raceKey] || CONFIG.RACES.HUMAN;
     const kingdomKey = raceConfig.kingdomKey;
     const tId = `t_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
     const town = new Town(tId, name, raceKey, x, y, this.playerId, kingdomKey);
     this.towns.push(town);
 
-    for (let i = 0; i < 5; i++) {
-      this.spawnUnit('WORKER', raceKey, x + (i % 3) - 1, y + Math.floor(i / 3) - 1, this.playerId, kingdomKey, tId);
-    }
-    for (let i = 0; i < 4; i++) {
-      this.spawnUnit('INFANTRY', raceKey, x + (i % 2), y + 2, this.playerId, kingdomKey, tId);
-    }
     for (let i = 0; i < 3; i++) {
-      this.spawnUnit('ARCHER', raceKey, x + (i % 2) - 1, y - 2, this.playerId, kingdomKey, tId);
+      this.spawnUnit('WORKER', raceKey, x + (i % 2), y + Math.floor(i / 2), this.playerId, kingdomKey, tId);
     }
     return town;
   }
 
   spawnUnit(type, raceKey, x, y, ownerId, kingdomKey = 'blue', townId = null) {
+    const raceConfig = CONFIG.RACES[raceKey] || CONFIG.RACES.HUMAN;
+    const isNaval = CONFIG.UNITS[type] ? CONFIG.UNITS[type].isNaval : false;
+    if (!this.world.isPassable(x, y, isNaval)) return null;
+
+    if (!townId && !isNaval) {
+      let existingTown = this.towns.find(t => t.kingdomKey === kingdomKey && Math.hypot(t.x - x, t.y - y) < 20);
+      if (!existingTown) {
+        existingTown = this.spawnKingdom(raceKey, `${raceConfig.name} Colony`, x, y);
+      }
+      if (existingTown) townId = existingTown.id;
+    }
+
     const uId = `u_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
     const unit = new Unit(uId, type, raceKey, x, y, ownerId, kingdomKey, townId);
     this.units.push(unit);

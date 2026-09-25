@@ -37,6 +37,7 @@ class Unit {
   }
 
   setMoveTarget(tx, ty, world) {
+    if (!world.isPassable(tx, ty, this.isNaval)) return;
     this.targetX = tx;
     this.targetY = ty;
     this.path = world.findPath(Math.round(this.x), Math.round(this.y), tx, ty, this.isNaval);
@@ -46,8 +47,22 @@ class Unit {
   update(world, gameState) {
     if (this.hp <= 0) return;
 
+    const rx = Math.round(this.x);
+    const ry = Math.round(this.y);
+    if (!world.isPassable(rx, ry, this.isNaval)) {
+      if (!this.isNaval) {
+        this.hp -= 15 / CONFIG.TICKS_PER_SEC;
+      }
+    }
+
     if (this.state === 'MOVING' && this.path.length > 0) {
       const nextTile = this.path[0];
+      if (!world.isPassable(nextTile.x, nextTile.y, this.isNaval)) {
+        this.path = [];
+        this.state = 'IDLE';
+        return;
+      }
+
       const dx = nextTile.x - this.x;
       const dy = nextTile.y - this.y;
       const dist = Math.hypot(dx, dy);
@@ -116,7 +131,7 @@ class Unit {
         for (let dx = -6; dx <= 6; dx++) {
           const nx = rx + dx;
           const ny = ry + dy;
-          if (world.getResource(nx, ny)) {
+          if (world.getResource(nx, ny) && world.isPassable(nx, ny, false)) {
             this.setMoveTarget(nx, ny, world);
             return;
           }
