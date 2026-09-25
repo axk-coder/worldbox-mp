@@ -4,7 +4,8 @@
   "description": "Tactical Army Control and Sandbox War Game with Procedural World Generation and Multi-Transport Sockets",
   "main": "server/server.js",
   "scripts": {
-    "start": "node server/server.js"
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js"
   },
   "dependencies": {
     "express": "^4.19.2",
