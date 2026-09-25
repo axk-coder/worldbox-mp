@@ -1,0 +1,121 @@
+class Unit {
+  constructor(id, type, x, y, ownerId, townId = null) {
+    this.id = id;
+    this.type = type;
+    this.x = x;
+    this.y = y;
+    this.targetX = x;
+    this.targetY = y;
+    this.ownerId = ownerId;
+    this.townId = townId;
+    this.stats = CONFIG.UNITS[type] || CONFIG.UNITS.INFANTRY;
+    this.hp = this.stats.hp;
+    this.maxHp = this.hp;
+    this.isNaval = this.stats.isNaval;
+    this.path = [];
+    this.attackTarget = null;
+    this.state = 'IDLE';
+    this.harvestTimer = 0;
+    this.selected = false;
+  }
+
+  setMoveTarget(tx, ty, world) {
+    this.targetX = tx;
+    this.targetY = ty;
+    this.path = world.findPath(Math.round(this.x), Math.round(this.y), tx, ty, this.isNaval);
+    this.state = 'MOVING';
+  }
+
+  update(world, gameState) {
+    if (this.hp <= 0) return;
+
+    if (this.state === 'MOVING' && this.path.length > 0) {
+      const nextTile = this.path[0];
+      const dx = nextTile.x - this.x;
+      const dy = nextTile.y - this.y;
+      const dist = Math.hypot(dx, dy);
+      const step = (this.stats.speed / CONFIG.TICKS_PER_SEC);
+
+      if (dist <= step) {
+        this.x = nextTile.x;
+        this.y = nextTile.y;
+        this.path.shift();
+        if (this.path.length === 0) {
+          this.state = 'IDLE';
+        }
+      } else {
+        this.x += (dx / dist) * step;
+        this.y += (dy / dist) * step;
+      }
+      return;
+    }
+
+    if (this.attackTarget) {
+      if (this.attackTarget.hp <= 0) {
+        this.attackTarget = null;
+        this.state = 'IDLE';
+        return;
+      }
+      const dist = Math.hypot(this.attackTarget.x - this.x, this.attackTarget.y - this.y);
+      if (dist <= this.stats.range) {
+        this.attackTarget.hp -= this.stats.atk / CONFIG.TICKS_PER_SEC;
+        this.state = 'ATTACKING';
+      } else {
+        this.setMoveTarget(Math.round(this.attackTarget.x), Math.round(this.attackTarget.y), world);
+      }
+      return;
+    }
+
+    if (this.type === 'WORKER') {
+      this.updateWorkerAI(world, gameState);
+      return;
+    }
+
+    this.scanForEnemies(gameState);
+  }
+
+  updateWorkerAI(world, gameState) {
+    const rx = Math.round(this.x);
+    const ry = Math.round(this.y);
+    const res = world.getResource(rx, ry);
+    if (res && res.amount > 0) {
+      this.harvestTimer++;
+      if (this.harvestTimer >= CONFIG.TICKS_PER_SEC * 2) {
+        this.harvestTimer = 0;
+        res.amount -= 10;
+        const town = gameState.towns.find(t => t.id === this.townId);
+        if (town) {
+          town.resources[res.type] = (town.resources[res.type] || 0) + 10;
+        }
+      }
+    } else if (this.state === 'IDLE' && Math.random() < 0.1) {
+      for (let dy = -5; dy <= 5; dy++) {
+        for (let dx = -5; dx <= 5; dx++) {
+          const nx = rx + dx;
+          const ny = ry + dy;
+          if (world.getResource(nx, ny)) {
+            this.setMoveTarget(nx, ny, world);
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  scanForEnemies(gameState) {
+    if (this.state === 'ATTACKING') return;
+    const enemies = gameState.units.filter(u => u.ownerId !== this.ownerId && u.hp > 0);
+    let closest = null;
+    let minDist = 8;
+    for (let enemy of enemies) {
+      const d = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+      if (d < minDist) {
+        minDist = d;
+        closest = enemy;
+      }
+    }
+    if (closest) {
+      this.attackTarget = closest;
+    }
+  }
+}

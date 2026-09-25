@@ -1,0 +1,27 @@
+{
+  "name": "world-box-army-multiplayer",
+  "version": "1.0.0",
+  "description": "Tactical Army Control and Sandbox War Game with Procedural World Generation and Multi-Transport Sockets",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.17.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/axk-dev/world-box-army-mp.git"
+  },
+  "keywords": [
+    "sandbox",
+    "rts",
+    "worldgen",
+    "multiplayer",
+    "webrtc",
+    "broadcastchannel"
+  ],
+  "author": "Axk War Studios",
+  "license": "MIT"
+}

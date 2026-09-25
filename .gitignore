@@ -1,0 +1,6 @@
+map.txt
+task.md
+node_modules/
+package-lock.json
+server/data/
+*.log
