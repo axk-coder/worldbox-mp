@@ -64,4 +64,18 @@ class SimplexNoise {
     }
     return 70.0 * (n0 + n1 + n2);
   }
+
+  fbm(x, y, octaves = 4, persistence = 0.5, lacunarity = 2.0) {
+    let total = 0;
+    let frequency = 1.0;
+    let amplitude = 1.0;
+    let maxValue = 0;
+    for (let i = 0; i < octaves; i++) {
+      total += this.noise2D(x * frequency, y * frequency) * amplitude;
+      maxValue += amplitude;
+      amplitude *= persistence;
+      frequency *= lacunarity;
+    }
+    return total / maxValue;
+  }
 }

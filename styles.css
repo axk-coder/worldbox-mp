@@ -10,8 +10,8 @@ body, html {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #0b0f19;
-  color: #e2e8f0;
+  background-color: #09090b;
+  color: #e4e4e7;
   font-family: system-ui, -apple-system, sans-serif;
   font-size: 13px;
 }
@@ -42,11 +42,11 @@ canvas#gameCanvas {
 }
 
 .ui-panel {
-  background: rgba(15, 23, 42, 0.92);
-  border: 1px solid #334155;
+  background: rgba(24, 24, 27, 0.94);
+  border: 1px solid #3f3f46;
   border-radius: 6px;
   padding: 8px 14px;
-  color: #f1f5f9;
+  color: #f4f4f5;
   pointer-events: auto;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
 }
@@ -61,7 +61,7 @@ canvas#gameCanvas {
 
 .title-panel .subtitle {
   font-size: 11px;
-  color: #94a3b8;
+  color: #a1a1aa;
 }
 
 .speed-bar {
@@ -90,36 +90,65 @@ canvas#gameCanvas {
   flex-direction: column;
   gap: 6px;
   pointer-events: auto;
-  background: rgba(15, 23, 42, 0.94);
+  background: rgba(24, 24, 27, 0.95);
   padding: 8px;
-  border: 1px solid #334155;
+  border: 1px solid #3f3f46;
   border-radius: 8px;
   z-index: 10;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
 }
 
-.toolbar-row {
+.toolbar-category-tabs {
   display: flex;
-  gap: 6px;
+  gap: 4px;
+  border-bottom: 1px solid #3f3f46;
+  padding-bottom: 6px;
   justify-content: center;
 }
 
-.tool-group {
-  display: flex;
-  gap: 4px;
-  padding-right: 6px;
-  border-right: 1px solid #334155;
+.tab-btn {
+  background: #18181b;
+  color: #a1a1aa;
+  border: 1px solid #3f3f46;
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
-.tool-group:last-child {
-  border-right: none;
-  padding-right: 0;
+.tab-btn:hover {
+  background: #27272a;
+  color: #f4f4f5;
+}
+
+.tab-btn.active {
+  background: #3f3f46;
+  color: #ffffff;
+  border-color: #71717a;
+}
+
+.toolbar-content {
+  padding-top: 4px;
+}
+
+.tool-category-panel {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.tool-category-panel.hidden {
+  display: none;
 }
 
 button.btn {
-  background: #1e293b;
-  color: #cbd5e1;
-  border: 1px solid #475569;
+  background: #18181b;
+  color: #d4d4d8;
+  border: 1px solid #3f3f46;
   padding: 6px 12px;
   font-family: inherit;
   font-size: 11px;
@@ -129,39 +158,39 @@ button.btn {
 }
 
 button.btn:hover {
-  background: #334155;
+  background: #27272a;
   color: #ffffff;
-  border-color: #64748b;
+  border-color: #71717a;
 }
 
 button.btn.active {
-  background: #2563eb;
+  background: #3f3f46;
   color: #ffffff;
-  border-color: #60a5fa;
+  border-color: #a1a1aa;
 }
 
 button.btn-danger {
-  background: #450a0a;
-  border-color: #991b1b;
-  color: #fca5a5;
+  background: #18181b;
+  border-color: #52525b;
+  color: #f4f4f5;
 }
 
 button.btn-danger:hover {
-  background: #7f1d1d;
+  background: #27272a;
   color: #ffffff;
-  border-color: #ef4444;
+  border-color: #71717a;
 }
 
 button.btn-god {
-  background: #14532d;
-  border-color: #16a34a;
-  color: #86efac;
+  background: #18181b;
+  border-color: #3f3f46;
+  color: #e4e4e7;
 }
 
 button.btn-god:hover {
-  background: #15803d;
+  background: #27272a;
   color: #ffffff;
-  border-color: #4ade80;
+  border-color: #71717a;
 }
 
 .side-panel {
@@ -179,10 +208,10 @@ button.btn-god:hover {
 .panel-header {
   font-weight: 700;
   font-size: 12px;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #3f3f46;
   padding-bottom: 4px;
   margin-bottom: 6px;
-  color: #94a3b8;
+  color: #a1a1aa;
   text-transform: uppercase;
 }
 
@@ -195,13 +224,13 @@ button.btn-god:hover {
 
 .control-row label {
   font-size: 11px;
-  color: #94a3b8;
+  color: #a1a1aa;
 }
 
 select.input-select, input.input-text {
-  background: #0f172a;
-  border: 1px solid #334155;
-  color: #f1f5f9;
+  background: #18181b;
+  border: 1px solid #3f3f46;
+  color: #f4f4f5;
   padding: 4px 8px;
   font-family: inherit;
   font-size: 11px;
@@ -215,7 +244,7 @@ select.input-select, input.input-text {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.82);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -227,8 +256,8 @@ select.input-select, input.input-text {
 }
 
 .modal-box {
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: #18181b;
+  border: 1px solid #3f3f46;
   width: 520px;
   max-width: 90vw;
   max-height: 85vh;
@@ -242,13 +271,13 @@ select.input-select, input.input-text {
   font-size: 16px;
   margin-bottom: 12px;
   color: #ffffff;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #3f3f46;
   padding-bottom: 6px;
 }
 
 .modal-box p, .modal-box ul {
   font-size: 12px;
-  color: #cbd5e1;
+  color: #d4d4d8;
   line-height: 1.5;
   margin-bottom: 10px;
 }
@@ -271,13 +300,13 @@ select.input-select, input.input-text {
   display: flex;
   gap: 12px;
   font-size: 11px;
-  color: #64748b;
+  color: #71717a;
   z-index: 10;
   pointer-events: auto;
 }
 
 .footer-links a, .footer-links button {
-  color: #94a3b8;
+  color: #a1a1aa;
   text-decoration: none;
   background: none;
   border: none;
@@ -287,6 +316,63 @@ select.input-select, input.input-text {
 }
 
 .footer-links a:hover, .footer-links button:hover {
-  color: #f1f5f9;
+  color: #f4f4f5;
   text-decoration: underline;
+}
+
+.main-menu-box {
+  text-align: center;
+  width: 440px;
+  padding: 28px 24px;
+}
+
+.main-menu-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #ffffff;
+  margin-bottom: 4px;
+}
+
+.main-menu-subtitle {
+  font-size: 12px;
+  color: #a1a1aa;
+  margin-bottom: 22px;
+}
+
+.main-menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+button.btn-menu-lg {
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  width: 100%;
+}
+
+.unit-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(24, 24, 27, 0.96);
+  border: 1px solid #52525b;
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #f4f4f5;
+  font-size: 11px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transform: translate(14px, 14px);
+  white-space: nowrap;
+}
+
+.unit-tooltip.hidden {
+  display: none;
 }

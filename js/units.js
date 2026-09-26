@@ -1,5 +1,5 @@
 class Unit {
-  constructor(id, type, raceKey, x, y, ownerId, kingdomKey = 'blue', townId = null) {
+  constructor(id, type, raceKey, x, y, ownerId, kingdomKey = 'blue', townId = null, initialAge = null, initialJob = null) {
     this.id = id;
     this.type = type;
     this.raceKey = raceKey || 'HUMAN';
@@ -11,7 +11,12 @@ class Unit {
     this.kingdomKey = kingdomKey;
     this.townId = townId;
     this.name = `${raceKey}_${Math.floor(Math.random() * 900 + 100)}`;
-    this.age = Math.floor(Math.random() * 25 + 18);
+
+    this.age = initialAge !== null ? initialAge : 0;
+    this.ageTimer = 0;
+    this.job = initialJob || (this.age < 18 ? 'CHILD' : this.assignJob());
+    this.mateCooldown = Math.floor(Math.random() * 100);
+
     this.kills = 0;
     this.level = 1;
 
@@ -34,7 +39,27 @@ class Unit {
     this.state = 'IDLE';
     this.harvestTimer = 0;
     this.harvestTargetRes = null;
+    this.carryingWood = 0;
+    this.hasBuildingWood = false;
     this.selected = false;
+  }
+
+  assignJob(town = null) {
+    if (this.isNaval) {
+      return 'SAILOR';
+    }
+    if (this.type === 'INFANTRY' || this.type === 'ARCHER') {
+      return 'ARMY_MAN';
+    }
+
+    const availableJobs = ['TREE_CHOPPER', 'MINER', 'HOUSE_BUILDER', 'ARMY_MAN'];
+    if (town) {
+      const unbuilt = town.buildings.filter(b => !b.isCompleted).length;
+      if (unbuilt > 0 && Math.random() < 0.4) {
+        return 'HOUSE_BUILDER';
+      }
+    }
+    return availableJobs[Math.floor(Math.random() * availableJobs.length)];
   }
 
   setMoveTarget(tx, ty, world) {
@@ -49,6 +74,24 @@ class Unit {
     if (this.hp <= 0) {
       this.releaseClaim();
       return;
+    }
+
+    if (this.mateCooldown > 0) {
+      this.mateCooldown--;
+    }
+
+    this.ageTimer += 1 / CONFIG.TICKS_PER_SEC;
+    if (this.ageTimer >= 10) {
+      this.ageTimer = 0;
+      this.age++;
+      if (this.age >= 18 && this.job === 'CHILD') {
+        const town = gameState.towns.find(t => t.id === this.townId);
+        this.job = this.assignJob(town);
+      }
+    }
+
+    if (this.age >= 18 && this.mateCooldown <= 0) {
+      this.tryMate(gameState);
     }
 
     const rx = Math.round(this.x);
@@ -109,12 +152,102 @@ class Unit {
       return;
     }
 
-    if (this.type === 'WORKER') {
-      this.updateWorkerAI(world, gameState);
+    if (this.job === 'CHILD') {
+      this.updateChildAI(world, gameState);
       return;
     }
 
+    if (this.job === 'ARMY_MAN' || this.type === 'INFANTRY' || this.type === 'ARCHER') {
+      this.updateArmyManAI(world, gameState);
+      return;
+    }
+
+    if (this.job === 'HOUSE_BUILDER') {
+      this.updateHouseBuilderAI(world, gameState);
+      return;
+    }
+
+    if (this.job === 'TREE_CHOPPER') {
+      this.updateTreeChopperAI(world, gameState);
+      return;
+    }
+
+    if (this.job === 'MINER') {
+      this.updateMinerAI(world, gameState);
+      return;
+    }
+  }
+
+  tryMate(gameState) {
+    if (this.mateCooldown > 0 || this.age < 18 || this.isNaval) return;
+
+    const town = gameState.towns.find(t => t.id === this.townId || t.kingdomKey === this.kingdomKey);
+    if (!town) return;
+
+    const completedHouses = town.buildings.filter(b => b.type === 'HOUSE' && b.isCompleted).length;
+    if (completedHouses < 1) return;
+
+    const totalPop = gameState.getTownUnitsCount(town.id);
+    if (totalPop >= completedHouses * 4) return;
+
+    if (town.resources.food < 12) return;
+
+    let partner = null;
+    if (gameState.spatialGrid) {
+      const candidates = gameState.spatialGrid.getUnitsInRadius(this.x, this.y, 2.2);
+      partner = candidates.find(u =>
+        u.id !== this.id &&
+        u.kingdomKey === this.kingdomKey &&
+        u.raceKey === this.raceKey &&
+        u.age >= 18 &&
+        !u.isNaval &&
+        u.mateCooldown <= 0
+      );
+    } else {
+      partner = gameState.units.find(u =>
+        u.id !== this.id &&
+        u.kingdomKey === this.kingdomKey &&
+        u.raceKey === this.raceKey &&
+        u.age >= 18 &&
+        !u.isNaval &&
+        u.mateCooldown <= 0 &&
+        Math.hypot(u.x - this.x, u.y - this.y) <= 2.2
+      );
+    }
+
+    if (partner) {
+      town.resources.food -= 12;
+      this.mateCooldown = CONFIG.TICKS_PER_SEC * 30;
+      partner.mateCooldown = CONFIG.TICKS_PER_SEC * 30;
+
+      const babyX = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, (this.x + partner.x) / 2));
+      const babyY = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - 1, (this.y + partner.y) / 2));
+
+      gameState.spawnUnit('WORKER', this.raceKey, babyX, babyY, this.ownerId, this.kingdomKey, town.id, 0, 'CHILD');
+    }
+  }
+
+  updateChildAI(world, gameState) {
+    if (this.state === 'IDLE' && Math.random() < 0.08) {
+      const town = gameState.towns.find(t => t.id === this.townId);
+      const centerX = town ? town.x : this.x;
+      const centerY = town ? town.y : this.y;
+      const nx = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, Math.round(centerX + (Math.random() - 0.5) * 6)));
+      const ny = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - 1, Math.round(centerY + (Math.random() - 0.5) * 6)));
+      this.setMoveTarget(nx, ny, world);
+    }
+  }
+
+  updateArmyManAI(world, gameState) {
     this.scanForEnemies(gameState);
+    if (this.state === 'IDLE' && Math.random() < 0.06) {
+      const town = gameState.towns.find(t => t.id === this.townId);
+      const centerX = town ? town.x : this.x;
+      const centerY = town ? town.y : this.y;
+      const nx = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, Math.round(centerX + (Math.random() - 0.5) * 12)));
+      const ny = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - 1, Math.round(centerY + (Math.random() - 0.5) * 12)));
+      this.setMoveTarget(nx, ny, world);
+    }
   }
 
   releaseClaim() {
@@ -124,30 +257,158 @@ class Unit {
     }
   }
 
-  updateWorkerAI(world, gameState) {
+  updateHouseBuilderAI(world, gameState) {
     const rx = Math.round(this.x);
     const ry = Math.round(this.y);
-    const town = gameState.towns.find(t => t.id === this.townId);
+    const town = gameState.towns.find(t => t.id === this.townId || t.kingdomKey === this.kingdomKey);
 
-    if (town) {
-      const unbuilt = town.buildings.find(b => !b.isCompleted);
-      if (unbuilt) {
-        this.releaseClaim();
-        const dist = Math.hypot(unbuilt.x - this.x, unbuilt.y - this.y);
-        if (dist <= 1.2) {
-          unbuilt.constructTick(15);
-        } else if (this.state === 'IDLE' || Math.random() < 0.06) {
-          this.setMoveTarget(unbuilt.x, unbuilt.y, world);
+    if (!town) {
+      if (this.state === 'IDLE' && Math.random() < 0.05) {
+        this.setMoveTarget(Math.round(this.x + (Math.random() - 0.5) * 6), Math.round(this.y + (Math.random() - 0.5) * 6), world);
+      }
+      return;
+    }
+
+    const stockpile = town.buildings.find(b => b.type === 'STOCKPILE' && b.isCompleted) || town.buildings.find(b => b.type === 'TOWN_HALL');
+    const unbuilt = town.buildings.find(b => !b.isCompleted);
+
+    if (unbuilt) {
+      this.releaseClaim();
+      if (!this.hasBuildingWood) {
+        if (stockpile) {
+          const distToStock = Math.hypot(stockpile.x - this.x, stockpile.y - this.y);
+          if (distToStock <= 1.2) {
+            if (town.resources.wood >= 10) {
+              town.resources.wood -= 10;
+              this.hasBuildingWood = true;
+              this.setMoveTarget(unbuilt.x, unbuilt.y, world);
+            }
+          } else if (this.state === 'IDLE' || Math.random() < 0.08) {
+            this.setMoveTarget(stockpile.x, stockpile.y, world);
+          }
+        }
+        return;
+      }
+
+      const distToSite = Math.hypot(unbuilt.x - this.x, unbuilt.y - this.y);
+      if (distToSite <= 1.2) {
+        unbuilt.constructTick(25);
+        this.hasBuildingWood = false;
+        this.state = 'BUILDING';
+      } else if (this.state === 'IDLE' || Math.random() < 0.08) {
+        this.setMoveTarget(unbuilt.x, unbuilt.y, world);
+      }
+      return;
+    }
+
+    if (town.resources.wood >= 20 && Math.random() < 0.05 && town.buildings.length < 15) {
+      const spot = town.findBuildSpot(world);
+      if (spot) {
+        let bType = 'HOUSE';
+        const houseCount = town.buildings.filter(b => b.type === 'HOUSE').length;
+        const barracksCount = town.buildings.filter(b => b.type === 'BARRACKS').length;
+        if (houseCount >= 2 && barracksCount === 0 && town.resources.stone >= 25) {
+          bType = 'BARRACKS';
+          town.resources.stone -= 25;
+        }
+        town.resources.wood -= 20;
+        town.addBuilding(bType, spot.x, spot.y);
+        town.expandTerritory(spot.x, spot.y, 3);
+        if (stockpile) {
+          this.setMoveTarget(stockpile.x, stockpile.y, world);
+        } else {
+          this.setMoveTarget(spot.x, spot.y, world);
         }
         return;
       }
     }
 
+    if (this.state === 'IDLE' && Math.random() < 0.06) {
+      const nx = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, Math.round(town.x + (Math.random() - 0.5) * 8)));
+      const ny = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - 1, Math.round(town.y + (Math.random() - 0.5) * 8)));
+      this.setMoveTarget(nx, ny, world);
+    }
+  }
+
+  updateTreeChopperAI(world, gameState) {
+    const rx = Math.round(this.x);
+    const ry = Math.round(this.y);
+    const town = gameState.towns.find(t => t.id === this.townId || t.kingdomKey === this.kingdomKey);
+    const stockpile = town ? (town.buildings.find(b => b.type === 'STOCKPILE' && b.isCompleted) || town.buildings.find(b => b.type === 'TOWN_HALL')) : null;
+
+    if (this.carryingWood >= 10 && stockpile) {
+      this.releaseClaim();
+      const dist = Math.hypot(stockpile.x - this.x, stockpile.y - this.y);
+      if (dist <= 1.2) {
+        if (town) {
+          town.resources.wood = (town.resources.wood || 0) + this.carryingWood;
+        }
+        this.carryingWood = 0;
+        this.state = 'IDLE';
+      } else if (this.state === 'IDLE' || Math.random() < 0.08) {
+        this.setMoveTarget(stockpile.x, stockpile.y, world);
+      }
+      return;
+    }
+
     const res = world.getResource(rx, ry);
-    if (res && res.amount > 0 && (!res.claimedBy || res.claimedBy === this.id)) {
+    if (res && res.type === CONFIG.RESOURCES.WOOD && res.amount > 0 && (!res.claimedBy || res.claimedBy === this.id)) {
       res.claimedBy = this.id;
       this.harvestTargetRes = res;
       this.harvestTimer++;
+      this.state = 'CHOPPING';
+
+      if (this.harvestTimer % 5 === 0) {
+        gameState.addChopFx(rx, ry);
+      }
+
+      if (this.harvestTimer >= CONFIG.TICKS_PER_SEC * 1.5) {
+        this.harvestTimer = 0;
+        res.amount -= 10;
+        this.carryingWood += 10;
+        if (res.amount <= 0) {
+          res.claimedBy = null;
+          this.harvestTargetRes = null;
+          world.setTile(rx, ry, CONFIG.TILES.GRASS);
+        }
+        if (stockpile) {
+          this.setMoveTarget(stockpile.x, stockpile.y, world);
+        }
+      }
+    } else {
+      this.releaseClaim();
+      if (this.state === 'IDLE' && Math.random() < 0.15) {
+        for (let dy = -6; dy <= 6; dy++) {
+          for (let dx = -6; dx <= 6; dx++) {
+            const nx = rx + dx;
+            const ny = ry + dy;
+            if (nx >= 0 && nx < CONFIG.WORLD_WIDTH && ny >= 0 && ny < CONFIG.WORLD_HEIGHT) {
+              const targetRes = world.getResource(nx, ny);
+              const tile = world.getTile(nx, ny);
+              if ((tile === CONFIG.TILES.FOREST || (targetRes && targetRes.type === CONFIG.RESOURCES.WOOD)) && targetRes && targetRes.amount > 0 && !targetRes.claimedBy && world.isPassable(nx, ny, false)) {
+                targetRes.claimedBy = this.id;
+                this.harvestTargetRes = targetRes;
+                this.setMoveTarget(nx, ny, world);
+                return;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  updateMinerAI(world, gameState) {
+    const rx = Math.round(this.x);
+    const ry = Math.round(this.y);
+    const town = gameState.towns.find(t => t.id === this.townId || t.kingdomKey === this.kingdomKey);
+
+    const res = world.getResource(rx, ry);
+    if (res && res.type === CONFIG.RESOURCES.STONE && res.amount > 0 && (!res.claimedBy || res.claimedBy === this.id)) {
+      res.claimedBy = this.id;
+      this.harvestTargetRes = res;
+      this.harvestTimer++;
+      this.state = 'MINING';
 
       if (this.harvestTimer % 5 === 0) {
         gameState.addChopFx(rx, ry);
@@ -157,7 +418,7 @@ class Unit {
         this.harvestTimer = 0;
         res.amount -= 10;
         if (town) {
-          town.resources[res.type] = (town.resources[res.type] || 0) + 10;
+          town.resources.stone = (town.resources.stone || 0) + 10;
         }
         if (res.amount <= 0) {
           res.claimedBy = null;
@@ -167,17 +428,20 @@ class Unit {
       }
     } else {
       this.releaseClaim();
-      if (this.state === 'IDLE' && Math.random() < 0.12) {
+      if (this.state === 'IDLE' && Math.random() < 0.15) {
         for (let dy = -6; dy <= 6; dy++) {
           for (let dx = -6; dx <= 6; dx++) {
             const nx = rx + dx;
             const ny = ry + dy;
-            const targetRes = world.getResource(nx, ny);
-            if (targetRes && targetRes.amount > 0 && !targetRes.claimedBy && world.isPassable(nx, ny, false)) {
-              targetRes.claimedBy = this.id;
-              this.harvestTargetRes = targetRes;
-              this.setMoveTarget(nx, ny, world);
-              return;
+            if (nx >= 0 && nx < CONFIG.WORLD_WIDTH && ny >= 0 && ny < CONFIG.WORLD_HEIGHT) {
+              const targetRes = world.getResource(nx, ny);
+              const tile = world.getTile(nx, ny);
+              if ((tile === CONFIG.TILES.MOUNTAIN || (targetRes && targetRes.type === CONFIG.RESOURCES.STONE)) && targetRes && targetRes.amount > 0 && !targetRes.claimedBy && world.isPassable(nx, ny, false)) {
+                targetRes.claimedBy = this.id;
+                this.harvestTargetRes = targetRes;
+                this.setMoveTarget(nx, ny, world);
+                return;
+              }
             }
           }
         }
@@ -187,16 +451,7 @@ class Unit {
 
   scanForEnemies(gameState) {
     if (this.state === 'ATTACKING') return;
-    const enemies = gameState.units.filter(u => u.kingdomKey !== this.kingdomKey && u.hp > 0);
-    let closest = null;
-    let minDist = 10;
-    for (let enemy of enemies) {
-      const d = Math.hypot(enemy.x - this.x, enemy.y - this.y);
-      if (d < minDist) {
-        minDist = d;
-        closest = enemy;
-      }
-    }
+    const closest = gameState.spatialGrid ? gameState.spatialGrid.findClosestEnemy(this, 10) : null;
     if (closest) {
       this.attackTarget = closest;
     }

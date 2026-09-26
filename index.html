@@ -31,6 +31,9 @@
       </div>
 
       <div class="ui-panel">
+        <button class="btn" id="btn-main-menu">Main Menu</button>
+        <button class="btn" id="btn-save-world">Save World</button>
+        <button class="btn" id="btn-load-world">Load World</button>
         <button class="btn" id="btn-multiplayer">Multiplayer</button>
         <button class="btn" id="btn-worldgen">New World</button>
       </div>
@@ -40,7 +43,7 @@
       <div class="panel-header">God Powers & Controls</div>
       <div class="control-row">
         <label>Active Tool:</label>
-        <span id="label-tool" style="font-weight:bold; color:#60a5fa;">Inspect</span>
+        <span id="label-tool" style="font-weight:bold; color:#e4e4e7;">Inspect</span>
       </div>
       <div class="control-row">
         <label>Transport Engine:</label>
@@ -53,6 +56,14 @@
         </select>
       </div>
       <div class="control-row">
+        <label>Room Role:</label>
+        <select id="select-role" class="input-select">
+          <option value="auto" selected>Auto-Detect</option>
+          <option value="client">Join Room (Client)</option>
+          <option value="host">Host Room</option>
+        </select>
+      </div>
+      <div class="control-row">
         <label>Room Code:</label>
         <input type="text" id="input-room-code" class="input-text" value="LAN_ROOM_1">
       </div>
@@ -60,31 +71,41 @@
     </div>
 
     <div class="bottom-toolbar">
-      <div class="toolbar-row">
-        <div class="tool-group">
-          <button class="btn active" data-tool="INSPECT">Inspect</button>
-          <button class="btn" data-tool="SELECT">Box Select Army</button>
-        </div>
-        <div class="tool-group">
-          <button class="btn-god btn" data-tool="SPAWN_HUMAN">Spawn Human</button>
-          <button class="btn-god btn" data-tool="SPAWN_ORC">Spawn Orc</button>
-          <button class="btn-god btn" data-tool="SPAWN_ELF">Spawn Elf</button>
-          <button class="btn-god btn" data-tool="SPAWN_DWARF">Spawn Dwarf</button>
-        </div>
+      <div class="toolbar-category-tabs">
+        <button class="tab-btn active" data-cat="cat-terrain">Terrain Options</button>
+        <button class="tab-btn" data-cat="cat-races">Races & Spawning</button>
+        <button class="tab-btn" data-cat="cat-god">God Disasters</button>
+        <button class="tab-btn" data-cat="cat-rts">RTS Controls</button>
       </div>
 
-      <div class="toolbar-row">
-        <div class="tool-group">
+      <div class="toolbar-content">
+        <div class="tool-category-panel" id="cat-terrain">
           <button class="btn" data-tool="RAISE_LAND">Raise Land</button>
           <button class="btn" data-tool="LOWER_LAND">Lower Sea</button>
           <button class="btn" data-tool="PLANT_FOREST">Plant Forest</button>
-          <button class="btn" data-tool="BUILD_MOUNTAIN">Build Peak</button>
+          <button class="btn" data-tool="BUILD_MOUNTAIN">Build Mountain</button>
+          <button class="btn" data-tool="ADD_SHALLOW_WATER">Shallow Water</button>
+          <button class="btn" data-tool="ADD_DEEP_WATER">Deep Water</button>
+          <button class="btn" data-tool="PLANT_GRASS">Plant Grass</button>
         </div>
-        <div class="tool-group">
+
+        <div class="tool-category-panel hidden" id="cat-races">
+          <button class="btn" data-tool="SPAWN_HUMAN">Spawn Human</button>
+          <button class="btn" data-tool="SPAWN_ORC">Spawn Orc</button>
+          <button class="btn" data-tool="SPAWN_ELF">Spawn Elf</button>
+          <button class="btn" data-tool="SPAWN_DWARF">Spawn Dwarf</button>
+        </div>
+
+        <div class="tool-category-panel hidden" id="cat-god">
           <button class="btn btn-danger" data-tool="BOMB">Drop Bomb</button>
           <button class="btn btn-danger" data-tool="MISSILE">Air Missile</button>
           <button class="btn btn-danger" data-tool="NUKE">Launch Nuke</button>
           <button class="btn btn-danger" data-tool="ACID">Acid Rain</button>
+        </div>
+
+        <div class="tool-category-panel hidden" id="cat-rts">
+          <button class="btn active" data-tool="INSPECT">Inspect Creature</button>
+          <button class="btn" data-tool="SELECT">Box Select Army</button>
         </div>
       </div>
     </div>
@@ -99,6 +120,31 @@
       <button id="btn-credits">Credits</button>
     </div>
 
+    <div id="modal-main-menu" class="modal-overlay hidden">
+      <div class="modal-box main-menu-box">
+        <h1 class="main-menu-title">WORLDBOX</h1>
+        <div class="main-menu-subtitle">God Simulation & RTS Army Command</div>
+        
+        <div class="main-menu-actions">
+          <button class="btn btn-menu-lg active" id="menu-btn-resume">Resume Simulation</button>
+          <button class="btn btn-menu-lg" id="menu-btn-new">Generate New World</button>
+          <button class="btn btn-menu-lg" id="menu-btn-save">Save World State</button>
+          <button class="btn btn-menu-lg" id="menu-btn-load">Load Saved World</button>
+          <button class="btn btn-menu-lg" id="menu-btn-multiplayer">Multiplayer Settings</button>
+          <button class="btn btn-menu-lg" id="menu-btn-credits">Credits & Legal</button>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="file-load-save" accept=".json" style="display:none;">
+
+    <div id="unit-hover-tooltip" class="unit-tooltip hidden">
+      <div id="tooltip-name" style="font-weight:700; color:#ffffff; font-size:12px;">--</div>
+      <div id="tooltip-info" style="color:#94a3b8;">--</div>
+      <div id="tooltip-job" style="color:#e4e4e7; font-weight:600;">--</div>
+      <div id="tooltip-hp" style="color:#cbd5e1;">--</div>
+      <div id="tooltip-state" style="color:#94a3b8; font-size:10px;">--</div>
+    </div>
+
     <div id="modal-inspector" class="modal-overlay hidden">
       <div class="modal-box">
         <h2>Creature Inspector</h2>
@@ -106,6 +152,8 @@
           <div><strong>Name:</strong> <span id="inspect-name">--</span></div>
           <div><strong>Race:</strong> <span id="inspect-race">--</span></div>
           <div><strong>Kingdom:</strong> <span id="inspect-kingdom">--</span></div>
+          <div><strong>Age:</strong> <span id="inspect-age">--</span></div>
+          <div><strong>Job:</strong> <span id="inspect-job">--</span></div>
           <div><strong>Health:</strong> <span id="inspect-hp">--</span></div>
           <div><strong>Attack:</strong> <span id="inspect-atk">--</span></div>
           <div><strong>Kills:</strong> <span id="inspect-kills">--</span></div>
@@ -161,7 +209,7 @@
         <h2>Credits & Attribution</h2>
         <p>Engine Architecture & Design:</p>
         <ul>
-          <li>WorldBox Simulation & RTS Engine: Axk War Studios</li>
+          <li>WorldBox Simulation & RTS Engine: WorldBox Open Source Community</li>
           <li>Simplex Procedural Terrain: Open Noise Library</li>
           <li>WebRTC & Transport Adapters: Native Web APIs</li>
         </ul>
@@ -183,6 +231,7 @@
   <script src="js/sockets/websocket.js"></script>
   <script src="js/sockets/polling.js"></script>
   <script src="js/sockets/transport.js"></script>
+  <script src="js/renderer.js"></script>
   <script src="js/game.js"></script>
 
   <script>
@@ -191,15 +240,30 @@
       game = new GameEngine('gameCanvas');
       game.start();
 
-      const toolButtons = document.querySelectorAll('.bottom-toolbar button');
+      const tabButtons = document.querySelectorAll('.toolbar-category-tabs .tab-btn');
+      const categoryPanels = document.querySelectorAll('.tool-category-panel');
+      tabButtons.forEach(tab => {
+        tab.addEventListener('click', () => {
+          tabButtons.forEach(t => t.classList.remove('active'));
+          categoryPanels.forEach(p => p.classList.add('hidden'));
+          tab.classList.add('active');
+          const targetCat = tab.getAttribute('data-cat');
+          const targetPanel = document.getElementById(targetCat);
+          if (targetPanel) targetPanel.classList.remove('hidden');
+        });
+      });
+
+      const toolButtons = document.querySelectorAll('.tool-category-panel button');
       const toolLabel = document.getElementById('label-tool');
       toolButtons.forEach(btn => {
         btn.addEventListener('click', () => {
           toolButtons.forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           const tool = btn.getAttribute('data-tool');
-          game.activeTool = tool;
-          toolLabel.innerText = btn.innerText;
+          if (tool && game) {
+            game.activeTool = tool;
+            toolLabel.innerText = btn.innerText;
+          }
         });
       });
 
@@ -218,6 +282,53 @@
       bindSpeed('speed-2x', 2);
       bindSpeed('speed-5x', 5);
 
+      document.getElementById('btn-main-menu').addEventListener('click', () => {
+        document.getElementById('modal-main-menu').classList.remove('hidden');
+      });
+      document.getElementById('menu-btn-resume').addEventListener('click', () => {
+        document.getElementById('modal-main-menu').classList.add('hidden');
+      });
+      document.getElementById('menu-btn-new').addEventListener('click', () => {
+        game.newGame();
+        document.getElementById('modal-main-menu').classList.add('hidden');
+      });
+      document.getElementById('menu-btn-save').addEventListener('click', () => {
+        game.saveGame();
+      });
+      document.getElementById('btn-save-world').addEventListener('click', () => {
+        game.saveGame();
+      });
+      document.getElementById('menu-btn-load').addEventListener('click', () => {
+        document.getElementById('file-load-save').click();
+      });
+      document.getElementById('btn-load-world').addEventListener('click', () => {
+        document.getElementById('file-load-save').click();
+      });
+      document.getElementById('menu-btn-multiplayer').addEventListener('click', () => {
+        document.getElementById('modal-main-menu').classList.add('hidden');
+        document.getElementById('modal-multiplayer').classList.remove('hidden');
+      });
+      document.getElementById('menu-btn-credits').addEventListener('click', () => {
+        document.getElementById('modal-main-menu').classList.add('hidden');
+        document.getElementById('modal-credits').classList.remove('hidden');
+      });
+
+      document.getElementById('file-load-save').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const parsed = JSON.parse(evt.target.result);
+            if (game.loadGame(parsed, false)) {
+              document.getElementById('modal-main-menu').classList.add('hidden');
+            }
+          } catch (err) {}
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+      });
+
       document.getElementById('btn-worldgen').addEventListener('click', () => {
         game.newGame();
       });
@@ -225,8 +336,16 @@
       document.getElementById('btn-apply-socket').addEventListener('click', () => {
         const type = document.getElementById('select-socket-type').value;
         const room = document.getElementById('input-room-code').value;
-        game.socketManager.init(type, room, true);
-        document.getElementById('stat-mode').innerText = type.split('_')[0];
+        const roleVal = document.getElementById('select-role').value;
+        const isHost = roleVal === 'host' ? true : (roleVal === 'client' ? false : true);
+        game.isHost = isHost;
+        game.socketManager.init(type, room, isHost);
+        game.updateHudModeText();
+        if (!isHost) {
+          setTimeout(() => {
+            game.requestWorldSync();
+          }, 300);
+        }
       });
 
       const bindModal = (btnId, modalId, closeId) => {

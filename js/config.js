@@ -1,6 +1,25 @@
+class DeterministicPRNG {
+  constructor(seed = 12345) {
+    this.seed = seed >>> 0;
+  }
+  setSeed(seed) {
+    this.seed = seed >>> 0;
+  }
+  next() {
+    let t = (this.seed += 0x6D2B79F5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  random() {
+    return this.next();
+  }
+}
+
 const CONFIG = {
-  WORLD_WIDTH: 160,
-  WORLD_HEIGHT: 160,
+  prng: new DeterministicPRNG(12345),
+  WORLD_WIDTH: 256,
+  WORLD_HEIGHT: 256,
   TILE_SIZE: 16,
   TICKS_PER_SEC: 20,
   RACES: {
@@ -14,6 +33,35 @@ const CONFIG = {
     red: { primary: '#dc2626', border: 'rgba(220, 38, 38, 0.35)', name: 'Orcish Horde' },
     green: { primary: '#059669', border: 'rgba(5, 150, 105, 0.35)', name: 'Elven Dominion' },
     yellow: { primary: '#d97706', border: 'rgba(217, 119, 6, 0.35)', name: 'Dwarven Hold' }
+  },
+  KINGDOM_PALETTE: [
+    { primary: '#2563eb', border: 'rgba(37, 99, 235, 0.35)' },
+    { primary: '#dc2626', border: 'rgba(220, 38, 38, 0.35)' },
+    { primary: '#059669', border: 'rgba(5, 150, 105, 0.35)' },
+    { primary: '#d97706', border: 'rgba(217, 119, 6, 0.35)' },
+    { primary: '#7c3aed', border: 'rgba(124, 58, 237, 0.35)' },
+    { primary: '#0891b2', border: 'rgba(8, 145, 178, 0.35)' },
+    { primary: '#ea580c', border: 'rgba(234, 88, 12, 0.35)' },
+    { primary: '#db2777', border: 'rgba(219, 39, 119, 0.35)' },
+    { primary: '#0d9488', border: 'rgba(13, 148, 136, 0.35)' },
+    { primary: '#65a30d', border: 'rgba(101, 163, 13, 0.35)' },
+    { primary: '#4f46e5', border: 'rgba(79, 70, 229, 0.35)' },
+    { primary: '#c026d3', border: 'rgba(192, 38, 211, 0.35)' }
+  ],
+  registerKingdom(kingdomKey, name, raceKey) {
+    if (this.KINGDOM_COLORS[kingdomKey]) {
+      if (name) this.KINGDOM_COLORS[kingdomKey].name = name;
+      return this.KINGDOM_COLORS[kingdomKey];
+    }
+    const count = Object.keys(this.KINGDOM_COLORS).length;
+    const pal = this.KINGDOM_PALETTE[count % this.KINGDOM_PALETTE.length];
+    const info = {
+      primary: pal.primary,
+      border: pal.border,
+      name: name || `Kingdom ${count + 1}`
+    };
+    this.KINGDOM_COLORS[kingdomKey] = info;
+    return info;
   },
   SOCKET_TYPES: {
     BROADCAST: 'BROADCAST_LAN',
@@ -52,6 +100,7 @@ const CONFIG = {
   },
   BUILDINGS: {
     TOWN_HALL: { id: 'TOWN_HALL', hp: 600, cost: { wood: 50, stone: 50 }, radius: 6 },
+    STOCKPILE: { id: 'STOCKPILE', hp: 350, cost: { wood: 10 }, radius: 3 },
     HOUSE: { id: 'HOUSE', hp: 200, cost: { wood: 20 }, radius: 2 },
     BARRACKS: { id: 'BARRACKS', hp: 400, cost: { wood: 40, stone: 30 }, radius: 3 },
     FARM: { id: 'FARM', hp: 120, cost: { wood: 15 }, radius: 2 },
@@ -70,5 +119,12 @@ const CONFIG = {
     MISSILE: { id: 'MISSILE', blastRadius: 7, damage: 400, crater: true },
     NUKE: { id: 'NUKE', blastRadius: 14, damage: 1200, crater: true, radioactive: true },
     ACID: { id: 'ACID', blastRadius: 5, damage: 150, crater: false }
+  },
+  JOBS: {
+    CHILD: { id: 'CHILD', name: 'Child', minAge: 0 },
+    TREE_CHOPPER: { id: 'TREE_CHOPPER', name: 'Tree Chopper', minAge: 18 },
+    MINER: { id: 'MINER', name: 'Miner', minAge: 18 },
+    HOUSE_BUILDER: { id: 'HOUSE_BUILDER', name: 'House Builder', minAge: 18 },
+    ARMY_MAN: { id: 'ARMY_MAN', name: 'Army Man', minAge: 18 }
   }
 };

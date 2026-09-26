@@ -9,8 +9,8 @@ class Building {
     this.stats = CONFIG.BUILDINGS[type];
     this.hp = this.stats ? this.stats.hp : 100;
     this.maxHp = this.hp;
-    this.isCompleted = type === 'TOWN_HALL';
-    this.progress = type === 'TOWN_HALL' ? 100 : 0;
+    this.isCompleted = (type === 'TOWN_HALL' || type === 'STOCKPILE');
+    this.progress = (type === 'TOWN_HALL' || type === 'STOCKPILE') ? 100 : 0;
   }
 
   constructTick(amount = 15) {
@@ -33,12 +33,13 @@ class Town {
     this.ownerId = ownerId;
     this.kingdomKey = kingdomKey;
     this.buildings = [];
-    this.resources = { wood: 150, stone: 80, gold: 80, food: 150 };
+    this.resources = { wood: 40, stone: 20, gold: 20, food: 60 };
     this.territory = new Set();
     this.level = 1;
     this.leader = null;
     this.electionTimer = 0;
     this.addBuilding('TOWN_HALL', x, y);
+    this.addBuilding('STOCKPILE', Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, x + 1)), y);
     this.expandTerritory(x, y, 6);
   }
 
@@ -56,7 +57,7 @@ class Town {
           const tx = cx + dx;
           const ty = cy + dy;
           if (tx >= 0 && tx < CONFIG.WORLD_WIDTH && ty >= 0 && ty < CONFIG.WORLD_HEIGHT) {
-            this.territory.add(`${tx},${ty}`);
+            this.territory.add(ty * CONFIG.WORLD_WIDTH + tx);
           }
         }
       }
@@ -83,9 +84,7 @@ class Town {
   }
 
   update(world, gameState) {
-    this.territory.forEach(key => {
-      const [tx, ty] = key.split(',').map(Number);
-      const idx = ty * world.width + tx;
+    this.territory.forEach(idx => {
       if (world.tiles[idx] !== CONFIG.TILES.DEEP_WATER && world.tiles[idx] !== CONFIG.TILES.SHALLOW_WATER) {
         world.kingdomOwner[idx] = this.kingdomKey;
       }
@@ -96,14 +95,6 @@ class Town {
       this.electionTimer = 0;
       this.holdElection(gameState);
       this.tradeWithOtherTowns(gameState);
-    }
-
-    const completedHouses = this.buildings.filter(b => b.type === 'HOUSE' && b.isCompleted).length;
-    if (this.resources.food > 20 && Math.random() < 0.08) {
-      if (completedHouses * 4 > gameState.getTownUnitsCount(this.id)) {
-        this.resources.food -= 15;
-        gameState.spawnUnit('WORKER', this.raceKey, this.x + (Math.random() > 0.5 ? 1 : -1), this.y + (Math.random() > 0.5 ? 1 : -1), this.ownerId, this.kingdomKey, this.id);
-      }
     }
 
     const barracks = this.buildings.filter(b => b.type === 'BARRACKS' && b.isCompleted);
@@ -155,11 +146,14 @@ class Town {
   }
 
   findBuildSpot(world) {
+    if (this.territory.size === 0) return null;
     const arr = Array.from(this.territory);
+    const len = arr.length;
     for (let i = 0; i < 25; i++) {
-      const key = arr[Math.floor(Math.random() * arr.length)];
-      if (!key) continue;
-      const [x, y] = key.split(',').map(Number);
+      const idx = arr[Math.floor(Math.random() * len)];
+      if (idx === undefined) continue;
+      const x = idx % CONFIG.WORLD_WIDTH;
+      const y = (idx / CONFIG.WORLD_WIDTH) | 0;
       if (world.isPassable(x, y) && !this.buildings.some(b => b.x === x && b.y === y)) {
         return { x, y };
       }
