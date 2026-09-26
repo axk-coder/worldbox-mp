@@ -1896,6 +1896,23 @@ class GameEngine {
         this.ctx.fillStyle = '#d97706';
         this.ctx.fillRect(sx + renderSize * 0.7, sy + offsetY + renderSize * 0.35, renderSize * 0.15, renderSize * 0.3);
       }
+
+      if (u.carryingWood > 0 || u.hasBuildingWood) {
+        this.ctx.fillStyle = '#8d6e63';
+        this.ctx.fillRect(sx + renderSize * 0.1, sy + offsetY + renderSize * 0.1, renderSize * 0.25, renderSize * 0.25);
+      } else if (u.carryingStone > 0) {
+        this.ctx.fillStyle = '#9e9e9e';
+        this.ctx.fillRect(sx + renderSize * 0.1, sy + offsetY + renderSize * 0.1, renderSize * 0.25, renderSize * 0.25);
+      } else if (u.carryingGold > 0) {
+        this.ctx.fillStyle = '#eab308';
+        this.ctx.fillRect(sx + renderSize * 0.1, sy + offsetY + renderSize * 0.1, renderSize * 0.25, renderSize * 0.25);
+      } else if (u.carryingIron > 0) {
+        this.ctx.fillStyle = '#b91c1c';
+        this.ctx.fillRect(sx + renderSize * 0.1, sy + offsetY + renderSize * 0.1, renderSize * 0.25, renderSize * 0.25);
+      } else if (u.carryingFood > 0) {
+        this.ctx.fillStyle = '#38bdf8';
+        this.ctx.fillRect(sx + renderSize * 0.1, sy + offsetY + renderSize * 0.1, renderSize * 0.25, renderSize * 0.25);
+      }
     }
 
     if (u.selected) {
