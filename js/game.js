@@ -1415,8 +1415,8 @@ class GameEngine {
           }
 
           const resNode = this.world.resources[idx];
-          if (resNode) {
-            if (resNode.nodeType === 'TREE' || tile === CONFIG.TILES.FOREST) {
+          if (resNode && resNode.amount > 0) {
+            if (resNode.nodeType === 'TREE' || resNode.type === 'wood' || tile === CONFIG.TILES.FOREST) {
               glR.pushQuad(wx + tileSize * 0.2, wy + tileSize * 0.8, tileSize * 0.6, tileSize * 0.2, 0.0, 0.0, 0.0, 0.25);
               glR.pushQuad(wx + tileSize * 0.4, wy + tileSize * 0.5, tileSize * 0.2, tileSize * 0.4, 0.36, 0.25, 0.22, 1.0);
               glR.pushQuad(wx + tileSize * 0.15, wy + tileSize * 0.1, tileSize * 0.7, tileSize * 0.5, 0.18, 0.49, 0.2, 1.0);
@@ -1674,7 +1674,8 @@ class GameEngine {
           this.ctx.fillRect(screenX, screenY, tileSize, tileSize);
         }
 
-        if (tile === CONFIG.TILES.FOREST) {
+        const resNodeCanvas = this.world.resources[idx];
+        if (resNodeCanvas && resNodeCanvas.amount > 0 && (resNodeCanvas.nodeType === 'TREE' || resNodeCanvas.type === 'wood' || tile === CONFIG.TILES.FOREST)) {
           this.renderPixelTree(screenX, screenY, tileSize);
         }
       }

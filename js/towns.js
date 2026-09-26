@@ -211,46 +211,67 @@ class Town {
     this.reclaimRuinedBuildings(gameState);
 
     let invadersNear = [];
-    const cityCenters = this.buildings.filter(b => b.type === 'TOWN_HALL' || b.type === 'STOCKPILE');
+    const cityCenters = this.buildings.filter(b => (b.type === 'TOWN_HALL' || b.type === 'STOCKPILE') && b.isCompleted && !b.isRuined);
     if (cityCenters.length === 0) {
       cityCenters.push({ x: this.x, y: this.y });
     }
 
     if (gameState.spatialGrid) {
       const candidateUnits = [];
+      const seenIds = new Set();
       for (let i = 0; i < cityCenters.length; i++) {
         const c = cityCenters[i];
-        candidateUnits.push(...gameState.spatialGrid.getUnitsInRadius(c.x, c.y, 4.0));
+        const unitsInRad = gameState.spatialGrid.getUnitsInRadius(c.x, c.y, 4.0);
+        for (let j = 0; j < unitsInRad.length; j++) {
+          const u = unitsInRad[j];
+          if (!seenIds.has(u.id)) {
+            seenIds.add(u.id);
+            if (u.kingdomKey !== this.kingdomKey && u.hp > 0 && (u.job === 'ARMY_MAN' || u.type === 'INFANTRY' || u.type === 'ARCHER') && (gameState.isAtWar ? gameState.isAtWar(u.kingdomKey, this.kingdomKey) : true)) {
+              candidateUnits.push(u);
+            }
+          }
+        }
       }
-      invadersNear = candidateUnits.filter(u => u.kingdomKey !== this.kingdomKey && u.hp > 0 && (u.job === 'ARMY_MAN' || u.type === 'INFANTRY' || u.type === 'ARCHER') && (gameState.isAtWar ? gameState.isAtWar(u.kingdomKey, this.kingdomKey) : true));
+      invadersNear = candidateUnits;
     } else {
       invadersNear = gameState.units.filter(u => u.kingdomKey !== this.kingdomKey && u.hp > 0 && (u.job === 'ARMY_MAN' || u.type === 'INFANTRY' || u.type === 'ARCHER') && (gameState.isAtWar ? gameState.isAtWar(u.kingdomKey, this.kingdomKey) : true) && cityCenters.some(c => Math.hypot(u.x - c.x, u.y - c.y) <= 4.0));
     }
 
     if (invadersNear.length > 0) {
-      if (this.siegeTimer === 0) {
-        this.siegeDuration = Math.floor((10 + CONFIG.prng.random() * 20) * CONFIG.TICKS_PER_SEC);
-        this.siegeAttackerKingdom = invadersNear[0].kingdomKey;
+      const currentAttackerPresent = this.siegeAttackerKingdom && invadersNear.some(u => u.kingdomKey === this.siegeAttackerKingdom);
+      if (this.siegeTimer === 0 || !this.siegeAttackerKingdom || !currentAttackerPresent) {
+        const attacker = invadersNear[0];
+        this.siegeDuration = Math.floor(200 + CONFIG.prng.random() * 401);
+        this.siegeAttackerKingdom = attacker.kingdomKey;
+        this.siegeTimer = 0;
       }
       this.siegeTimer++;
       if (this.siegeTimer >= this.siegeDuration) {
         const oldKingdom = this.kingdomKey;
         const newKingdom = this.siegeAttackerKingdom;
+        const conquerorUnit = invadersNear.find(u => u.kingdomKey === newKingdom) || invadersNear[0];
+        const conquerorOwnerId = conquerorUnit ? conquerorUnit.ownerId : this.ownerId;
         const wasCapital = this.isCapital;
 
         this.isCapital = false;
         this.kingdomKey = newKingdom;
-        this.ownerId = invadersNear[0].ownerId || this.ownerId;
+        this.ownerId = conquerorOwnerId;
+
         gameState.units.filter(u => u.townId === this.id && u.hp > 0).forEach(u => {
           u.kingdomKey = newKingdom;
-          u.ownerId = invadersNear[0].ownerId || u.ownerId;
+          u.ownerId = conquerorOwnerId;
           u.attackTarget = null;
           u.state = 'IDLE';
+          u.siegeTargetTownId = null;
+          u.siegeTimer = 0;
+          u.siegeDuration = 0;
         });
+
         this.buildings.forEach(b => {
           b.kingdomKey = newKingdom;
-          b.ownerId = invadersNear[0].ownerId || b.ownerId;
+          b.ownerId = conquerorOwnerId;
         });
+
         this.territory.forEach(idx => {
           if (world.tiles[idx] !== CONFIG.TILES.DEEP_WATER && world.tiles[idx] !== CONFIG.TILES.SHALLOW_WATER) {
             world.kingdomOwner[idx] = newKingdom;
@@ -265,6 +286,7 @@ class Town {
         if (!conqueredKingdomTowns.some(t => t.isCapital)) {
           this.isCapital = true;
         }
+
         this.siegeTimer = 0;
         this.siegeDuration = 0;
         this.siegeAttackerKingdom = null;

@@ -769,6 +769,9 @@ class Unit {
         if (res.amount <= 0) {
           res.claimedBy = null;
           this.harvestTargetRes = null;
+          if (world && world.resources) {
+            world.resources[ry * (world.width || CONFIG.WORLD_WIDTH) + rx] = null;
+          }
           world.setTile(rx, ry, CONFIG.TILES.GRASS);
         }
         if (stockpile) {
