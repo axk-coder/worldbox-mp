@@ -120,8 +120,8 @@ class GameEngine {
   generateKingdomName(raceKey) {
     const prefixes = ['Valoria', 'Ironfang', 'Silverwood', 'Solaria', 'Stonepeak', 'Drakon', 'Thunder', 'Shadow', 'Aethel', 'Grimm'];
     const suffixes = ['Kingdom', 'Horde', 'Dominion', 'Hold', 'Empire', 'Realm', 'Clan', 'Dynasty'];
-    const p = prefixes[Math.floor(Math.random() * prefixes.length)];
-    const s = suffixes[Math.floor(Math.random() * suffixes.length)];
+    const p = prefixes[Math.floor(CONFIG.prng.random() * prefixes.length)];
+    const s = suffixes[Math.floor(CONFIG.prng.random() * suffixes.length)];
     return `${p} ${s}`;
   }
 
@@ -129,12 +129,12 @@ class GameEngine {
     this.clouds = [];
     for (let i = 0; i < 28; i++) {
       this.clouds.push({
-        x: Math.random() * CONFIG.WORLD_WIDTH,
-        y: Math.random() * CONFIG.WORLD_HEIGHT,
-        scale: 1.2 + Math.random() * 1.5,
-        speed: 0.15 + Math.random() * 0.25,
-        isRaining: Math.random() < 0.25,
-        rainTimer: Math.floor(Math.random() * 300)
+        x: CONFIG.prng.random() * CONFIG.WORLD_WIDTH,
+        y: CONFIG.prng.random() * CONFIG.WORLD_HEIGHT,
+        scale: 1.2 + CONFIG.prng.random() * 1.5,
+        speed: 0.15 + CONFIG.prng.random() * 0.25,
+        isRaining: CONFIG.prng.random() < 0.25,
+        rainTimer: Math.floor(CONFIG.prng.random() * 300)
       });
     }
   }
@@ -150,12 +150,13 @@ class GameEngine {
   }
 
   newGame() {
-    const freshSeed = Math.floor(Math.random() * 9999999);
+    const freshSeed = Math.floor(CONFIG.prng.random() * 9999999);
     this.world.generate(freshSeed);
     this.towns = [];
     this.units = [];
     this.projectiles = [];
     this.fx = [];
+    this.warSourceKingdom = null;
 
     this.centerCameraOn(80, 80);
     if (this.isHost && this.socketManager) {
@@ -209,13 +210,16 @@ class GameEngine {
     return null;
   }
 
-  spawnKingdom(raceKey, name, x, y) {
+  spawnKingdom(raceKey, name, x, y, kingdomKey = null) {
     if (!this.world.isPassable(x, y, false)) return null;
 
-    const raceConfig = CONFIG.RACES[raceKey] || CONFIG.RACES.HUMAN;
-    const kingdomKey = raceConfig.kingdomKey;
+    if (!kingdomKey) {
+      kingdomKey = `k_${raceKey.toLowerCase()}_${this.towns.length + 1}_${Math.floor(CONFIG.prng.random() * 1000)}`;
+    }
     const kingdomName = name || this.generateKingdomName(raceKey);
-    const tId = `t_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    CONFIG.registerKingdom(kingdomKey, kingdomName, raceKey);
+
+    const tId = `t_${Math.floor(CONFIG.prng.random() * 100000000).toString(36)}`;
     const town = new Town(tId, kingdomName, raceKey, x, y, this.playerId, kingdomKey);
     this.towns.push(town);
 
@@ -225,42 +229,90 @@ class GameEngine {
     return town;
   }
 
-  spawnUnit(type, raceKey, x, y, ownerId, kingdomKey = 'blue', townId = null, initialAge = 21, initialJob = null) {
+  spawnUnit(type, raceKey, x, y, ownerId, kingdomKey = null, townId = null, initialAge = 21, initialJob = null) {
     const raceConfig = CONFIG.RACES[raceKey] || CONFIG.RACES.HUMAN;
     const isNaval = CONFIG.UNITS[type] ? CONFIG.UNITS[type].isNaval : false;
     if (!this.world.isPassable(x, y, isNaval)) return null;
 
     if (!townId && !isNaval) {
-      const nearby = this.findNearbyKingdom(x, y, 16);
-      if (nearby) {
-        kingdomKey = nearby.kingdomKey;
-        if (nearby.town) {
-          townId = nearby.town.id;
-        } else {
-          const existingTown = this.towns.find(t => t.kingdomKey === kingdomKey);
-          if (existingTown) {
-            townId = existingTown.id;
+      if (kingdomKey && this.towns.some(t => t.kingdomKey === kingdomKey)) {
+        const existingTown = this.towns.find(t => t.kingdomKey === kingdomKey);
+        if (existingTown) townId = existingTown.id;
+      } else {
+        const nearby = this.findNearbyKingdom(x, y, 16);
+        if (nearby) {
+          kingdomKey = nearby.kingdomKey;
+          if (nearby.town) {
+            townId = nearby.town.id;
           } else {
-            const newTown = this.spawnKingdom(raceKey, null, Math.floor(x), Math.floor(y));
-            if (newTown) {
-              kingdomKey = newTown.kingdomKey;
-              townId = newTown.id;
+            const existingTown = this.towns.find(t => t.kingdomKey === kingdomKey);
+            if (existingTown) {
+              townId = existingTown.id;
+            } else {
+              const newTown = this.spawnKingdom(raceKey, null, Math.floor(x), Math.floor(y), kingdomKey);
+              if (newTown) {
+                kingdomKey = newTown.kingdomKey;
+                townId = newTown.id;
+              }
             }
           }
-        }
-      } else {
-        const newTown = this.spawnKingdom(raceKey, null, Math.floor(x), Math.floor(y));
-        if (newTown) {
-          kingdomKey = newTown.kingdomKey;
-          townId = newTown.id;
+        } else {
+          const newTown = this.spawnKingdom(raceKey, null, Math.floor(x), Math.floor(y), kingdomKey);
+          if (newTown) {
+            kingdomKey = newTown.kingdomKey;
+            townId = newTown.id;
+          }
         }
       }
     }
 
-    const uId = `u_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    if (!kingdomKey) {
+      kingdomKey = raceConfig.kingdomKey;
+    }
+    CONFIG.registerKingdom(kingdomKey, null, raceKey);
+
+    const uId = `u_${Math.floor(CONFIG.prng.random() * 100000000).toString(36)}`;
     const unit = new Unit(uId, type, raceKey, x, y, ownerId, kingdomKey, townId, initialAge, initialJob);
     this.units.push(unit);
     return unit;
+  }
+
+  initiateWar(sourceKingdomKey, targetKingdomKey) {
+    if (!sourceKingdomKey || !targetKingdomKey || sourceKingdomKey === targetKingdomKey) return;
+
+    const targetTown = this.towns.find(t => t.kingdomKey === targetKingdomKey);
+    const sourceTown = this.towns.find(t => t.kingdomKey === sourceKingdomKey);
+    const targetX = targetTown ? targetTown.x : CONFIG.WORLD_WIDTH / 2;
+    const targetY = targetTown ? targetTown.y : CONFIG.WORLD_HEIGHT / 2;
+    const sourceX = sourceTown ? sourceTown.x : CONFIG.WORLD_WIDTH / 2;
+    const sourceY = sourceTown ? sourceTown.y : CONFIG.WORLD_HEIGHT / 2;
+
+    const sourceUnits = this.units.filter(u => u.kingdomKey === sourceKingdomKey && u.hp > 0);
+    const targetUnits = this.units.filter(u => u.kingdomKey === targetKingdomKey && u.hp > 0);
+
+    const enemyInTarget = targetUnits[0] || null;
+    const enemyInSource = sourceUnits[0] || null;
+
+    sourceUnits.forEach(u => {
+      if (enemyInTarget) {
+        u.attackTarget = enemyInTarget;
+      }
+      u.setMoveTarget(Math.floor(targetX), Math.floor(targetY), this.world);
+    });
+
+    targetUnits.forEach(u => {
+      if (enemyInSource) {
+        u.attackTarget = enemyInSource;
+      }
+      u.setMoveTarget(Math.floor(sourceX), Math.floor(sourceY), this.world);
+    });
+
+    this.addExplosionFx(targetX, targetY, 4, false);
+    this.addExplosionFx(sourceX, sourceY, 4, false);
+
+    if (this.isHost) {
+      this.broadcastWorldSync();
+    }
   }
 
   getTownUnitsCount(townId) {
@@ -278,11 +330,11 @@ class GameEngine {
   addChopFx(x, y) {
     for (let i = 0; i < 3; i++) {
       this.fx.push({
-        x: x + (Math.random() - 0.5) * 0.6,
-        y: y + (Math.random() - 0.5) * 0.6,
+        x: x + (CONFIG.prng.random() - 0.5) * 0.6,
+        y: y + (CONFIG.prng.random() - 0.5) * 0.6,
         radius: 0.15,
         isChop: true,
-        color: Math.random() > 0.5 ? '#8d6e63' : '#2e7d32',
+        color: CONFIG.prng.random() > 0.5 ? '#8d6e63' : '#2e7d32',
         life: 0.4,
         maxLife: 0.4
       });
@@ -377,22 +429,34 @@ class GameEngine {
     if (!this.isHost || !req) return;
 
     if (req.actionType === 'BRUSH_TERRAIN') {
-      this.world.applyBrush(req.x, req.y, req.radius || 3, req.tool);
+      const allowedTools = ['RAISE_LAND', 'LOWER_LAND', 'PLANT_FOREST', 'BUILD_MOUNTAIN', 'ADD_SHALLOW_WATER', 'ADD_DEEP_WATER', 'PLANT_GRASS'];
+      if (!allowedTools.includes(req.tool)) return;
+      const x = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, parseInt(req.x) || 0));
+      const y = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - 1, parseInt(req.y) || 0));
+      const radius = Math.max(1, Math.min(10, parseInt(req.radius) || 3));
+      this.world.applyBrush(x, y, radius, req.tool);
     } else if (req.actionType === 'SPAWN_CREATURE') {
-      const kKey = CONFIG.RACES[req.raceKey] ? CONFIG.RACES[req.raceKey].kingdomKey : 'blue';
-      this.spawnUnit('WORKER', req.raceKey, req.x, req.y, req.sender || 'client', kKey, null, 21);
+      if (!CONFIG.RACES[req.raceKey]) return;
+      const x = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, parseInt(req.x) || 0));
+      const y = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - 1, parseInt(req.y) || 0));
+      this.spawnUnit('WORKER', req.raceKey, x, y, req.sender || 'client', null, null, 21);
     } else if (req.actionType === 'LAUNCH_WEAPON') {
-      this.launchWeapon(req.weaponType, req.targetX, req.targetY);
+      if (!CONFIG.WEAPONS[req.weaponType]) return;
+      const tx = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, parseFloat(req.targetX) || 0));
+      const ty = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - 1, parseFloat(req.targetY) || 0));
+      this.launchWeapon(req.weaponType, tx, ty);
     } else if (req.actionType === 'COMMAND_UNITS') {
-      const ids = req.unitIds || [];
-      const targetTileX = Math.floor(req.targetX);
-      const targetTileY = Math.floor(req.targetY);
+      const ids = Array.isArray(req.unitIds) ? req.unitIds.slice(0, 500) : [];
+      const tx = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, parseFloat(req.targetX) || 0));
+      const ty = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - 1, parseFloat(req.targetY) || 0));
+      const targetTileX = Math.floor(tx);
+      const targetTileY = Math.floor(ty);
       const unitsToMove = this.units.filter(u => ids.includes(u.id));
 
-      const nearbyUnits = this.spatialGrid ? this.spatialGrid.getUnitsInRadius(req.targetX, req.targetY, 1.5) : this.units;
+      const nearbyUnits = this.spatialGrid ? this.spatialGrid.getUnitsInRadius(tx, ty, 1.5) : this.units;
 
       unitsToMove.forEach((unit, idx) => {
-        const enemyUnit = nearbyUnits.find(u => u.kingdomKey !== unit.kingdomKey && Math.hypot(u.x - req.targetX, u.y - req.targetY) < 1.5);
+        const enemyUnit = nearbyUnits.find(u => u.kingdomKey !== unit.kingdomKey && Math.hypot(u.x - tx, u.y - ty) < 1.5);
         const offsetX = (idx % 4) - 1.5;
         const offsetY = Math.floor(idx / 4) - 1.5;
         const finalX = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, Math.round(targetTileX + offsetX)));
@@ -405,6 +469,12 @@ class GameEngine {
           unit.setMoveTarget(finalX, finalY, this.world);
         }
       });
+    } else if (req.actionType === 'DECLARE_WAR') {
+      const src = String(req.sourceKingdom || '').slice(0, 64);
+      const tgt = String(req.targetKingdom || '').slice(0, 64);
+      if (src && tgt && src !== tgt && CONFIG.KINGDOM_COLORS[src] && CONFIG.KINGDOM_COLORS[tgt]) {
+        this.initiateWar(src, tgt);
+      }
     }
 
     this.broadcastWorldSync();
@@ -416,6 +486,8 @@ class GameEngine {
 
     return {
       seed: this.world.seed,
+      prngSeed: CONFIG.prng.seed,
+      kingdomColors: CONFIG.KINGDOM_COLORS,
       tilesB64: this.encodeBytesToBase64(this.world.tiles),
       heightMapB64: this.encodeBytesToBase64(heightBytes),
       waterVolumeB64: this.encodeBytesToBase64(waterBytes),
@@ -489,6 +561,14 @@ class GameEngine {
   applyWorldSync(snapshot) {
     if (this.isHost || !snapshot) return;
 
+    if (snapshot.prngSeed !== undefined) {
+      CONFIG.prng.setSeed(snapshot.prngSeed);
+    }
+
+    if (snapshot.kingdomColors) {
+      Object.assign(CONFIG.KINGDOM_COLORS, snapshot.kingdomColors);
+    }
+
     if (snapshot.tilesB64) {
       this.world.tiles = this.decodeBase64ToBytes(snapshot.tilesB64);
     } else if (snapshot.tiles) {
@@ -551,9 +631,20 @@ class GameEngine {
         let unit = existingUnitMap.get(uData.id);
         if (!unit) {
           unit = new Unit(uData.id, uData.type, uData.raceKey, uData.x, uData.y, uData.ownerId, uData.kingdomKey, uData.townId, uData.age, uData.job);
+          unit.x = uData.x;
+          unit.y = uData.y;
+        } else {
+          const dist = Math.hypot(unit.x - uData.x, unit.y - uData.y);
+          if (dist > 3.0) {
+            unit.x = uData.x;
+            unit.y = uData.y;
+          } else {
+            unit.x += (uData.x - unit.x) * 0.4;
+            unit.y += (uData.y - unit.y) * 0.4;
+          }
         }
-        unit.x = uData.x;
-        unit.y = uData.y;
+        unit.targetSnapX = uData.x;
+        unit.targetSnapY = uData.y;
         unit.hp = uData.hp;
         unit.maxHp = uData.maxHp;
         unit.age = uData.age;
@@ -564,6 +655,8 @@ class GameEngine {
         unit.level = uData.level || 1;
         unit.kills = uData.kills || 0;
         unit.isNaval = uData.isNaval || false;
+        unit.kingdomKey = uData.kingdomKey;
+        unit.townId = uData.townId;
         return unit;
       });
     }
@@ -601,6 +694,7 @@ class GameEngine {
     const saveData = {
       version: 1,
       timestamp: Date.now(),
+      kingdomColors: CONFIG.KINGDOM_COLORS,
       world: {
         width: this.world.width,
         height: this.world.height,
@@ -670,6 +764,10 @@ class GameEngine {
 
   loadGame(saveData, isNetworkSync = false) {
     if (!saveData || !saveData.world) return false;
+
+    if (saveData.kingdomColors) {
+      Object.assign(CONFIG.KINGDOM_COLORS, saveData.kingdomColors);
+    }
 
     this.world.width = saveData.world.width;
     this.world.height = saveData.world.height;
@@ -781,11 +879,54 @@ class GameEngine {
         } else if (['SPAWN_HUMAN', 'SPAWN_ORC', 'SPAWN_ELF', 'SPAWN_DWARF'].includes(this.activeTool)) {
           const raceKey = this.activeTool.replace('SPAWN_', '');
           if (this.isHost) {
-            const kingdomKey = CONFIG.RACES[raceKey].kingdomKey;
-            this.spawnUnit('WORKER', raceKey, tx, ty, this.playerId, kingdomKey, null, 21);
+            this.spawnUnit('WORKER', raceKey, tx, ty, this.playerId, null, null, 21);
             this.broadcastWorldSync();
           } else {
             this.socketManager.send({ type: 'CLIENT_ACTION_REQUEST', actionType: 'SPAWN_CREATURE', raceKey, x: tx, y: ty, sender: this.playerId });
+          }
+        } else if (this.activeTool === 'WAR_STARTER') {
+          let clickedKingdomKey = null;
+          const clickedUnit = this.spatialGrid ? this.spatialGrid.getUnitsInRadius(worldPos.x, worldPos.y, 1.5)[0] : this.units.find(u => Math.hypot(u.x - worldPos.x, u.y - worldPos.y) < 1.5);
+          if (clickedUnit) {
+            clickedKingdomKey = clickedUnit.kingdomKey;
+          } else {
+            const clickedTown = this.towns.find(t => Math.hypot(t.x - worldPos.x, t.y - worldPos.y) < 6);
+            if (clickedTown) {
+              clickedKingdomKey = clickedTown.kingdomKey;
+            } else {
+              clickedKingdomKey = this.world.kingdomOwner[ty * this.world.width + tx];
+            }
+          }
+
+          if (!this.warSourceKingdom) {
+            if (clickedKingdomKey) {
+              this.warSourceKingdom = clickedKingdomKey;
+              const kInfo = CONFIG.KINGDOM_COLORS[clickedKingdomKey];
+              const toolLabel = document.getElementById('label-tool');
+              if (toolLabel) toolLabel.innerText = `War Starter: Pick Target (Source: ${kInfo ? kInfo.name : clickedKingdomKey})`;
+            } else if (this.towns.length >= 2) {
+              const src = this.towns[0].kingdomKey;
+              const tgt = this.towns[1].kingdomKey;
+              if (this.isHost) {
+                this.initiateWar(src, tgt);
+              } else {
+                this.socketManager.send({ type: 'CLIENT_ACTION_REQUEST', actionType: 'DECLARE_WAR', sourceKingdom: src, targetKingdom: tgt, sender: this.playerId });
+              }
+            }
+          } else {
+            const src = this.warSourceKingdom;
+            const tgt = clickedKingdomKey || (this.towns.find(t => t.kingdomKey !== src) ? this.towns.find(t => t.kingdomKey !== src).kingdomKey : null);
+            this.warSourceKingdom = null;
+            const toolLabel = document.getElementById('label-tool');
+            if (toolLabel) toolLabel.innerText = 'War Starter';
+
+            if (src && tgt && src !== tgt) {
+              if (this.isHost) {
+                this.initiateWar(src, tgt);
+              } else {
+                this.socketManager.send({ type: 'CLIENT_ACTION_REQUEST', actionType: 'DECLARE_WAR', sourceKingdom: src, targetKingdom: tgt, sender: this.playerId });
+              }
+            }
           }
         }
       }
@@ -963,11 +1104,11 @@ class GameEngine {
 
       if (c.x > CONFIG.WORLD_WIDTH + 15) {
         c.x = -25;
-        c.y = Math.random() * (CONFIG.WORLD_HEIGHT + 20) - 10;
+        c.y = CONFIG.prng.random() * (CONFIG.WORLD_HEIGHT + 20) - 10;
       }
       if (c.y > CONFIG.WORLD_HEIGHT + 15) {
         c.y = -25;
-        c.x = Math.random() * (CONFIG.WORLD_WIDTH + 20) - 10;
+        c.x = CONFIG.prng.random() * (CONFIG.WORLD_WIDTH + 20) - 10;
       }
 
       c.rainTimer++;
@@ -976,12 +1117,12 @@ class GameEngine {
         c.isRaining = !c.isRaining;
       }
 
-      if (this.isHost && c.isRaining && Math.random() < 0.2) {
-        const rx = Math.floor(c.x + Math.random() * (c.scale || 2));
-        const ry = Math.floor(c.y + Math.random() * ((c.scale || 2) * 0.5));
+      if (c.isRaining && CONFIG.prng.random() < 0.2) {
+        const rx = Math.floor(c.x + CONFIG.prng.random() * (c.scale || 2));
+        const ry = Math.floor(c.y + CONFIG.prng.random() * ((c.scale || 2) * 0.5));
         if (rx >= 0 && rx < CONFIG.WORLD_WIDTH && ry >= 0 && ry < CONFIG.WORLD_HEIGHT) {
           const tile = this.world.getTile(rx, ry);
-          if (tile === CONFIG.TILES.GRASS && Math.random() < 0.15) {
+          if (tile === CONFIG.TILES.GRASS && CONFIG.prng.random() < 0.15) {
             this.world.setTile(rx, ry, CONFIG.TILES.FOREST);
             this.world.resources[ry * this.world.width + rx] = { type: CONFIG.RESOURCES.WOOD, amount: 150 };
           } else if (tile === CONFIG.TILES.CRATER) {
@@ -1029,8 +1170,26 @@ class GameEngine {
     } else {
       for (let step = 0; step < this.simSpeed; step++) {
         this.waterPhase += 0.05;
+        this.world.tickFallout();
+        this.world.updateErosion();
+        this.world.updateWaterFlow();
+
+        this.spatialGrid.clear();
+        for (let i = 0; i < this.units.length; i++) {
+          if (this.units[i].hp > 0) {
+            this.spatialGrid.insert(this.units[i]);
+          }
+        }
+
+        this.towns.forEach(t => t.update(this.world, this));
+        this.units.forEach(u => u.update(this.world, this));
+        this.units = this.units.filter(u => u.hp > 0);
+        this.projectiles.forEach(p => p.update(this.world, this));
+        this.projectiles = this.projectiles.filter(p => !p.completed);
+
         this.fx.forEach(f => f.life -= 1 / (CONFIG.TICKS_PER_SEC * f.maxLife));
         this.fx = this.fx.filter(f => f.life > 0);
+
         this.updateClouds();
       }
     }

@@ -7,15 +7,17 @@ class Unit {
     this.y = y;
     this.targetX = x;
     this.targetY = y;
+    this.targetSnapX = x;
+    this.targetSnapY = y;
     this.ownerId = ownerId;
     this.kingdomKey = kingdomKey;
     this.townId = townId;
-    this.name = `${raceKey}_${Math.floor(Math.random() * 900 + 100)}`;
+    this.name = `${raceKey}_${Math.floor(CONFIG.prng.random() * 900 + 100)}`;
 
     this.age = initialAge !== null ? initialAge : 0;
     this.ageTimer = 0;
     this.job = initialJob || (this.age < 18 ? 'CHILD' : this.assignJob());
-    this.mateCooldown = Math.floor(Math.random() * 100);
+    this.mateCooldown = Math.floor(CONFIG.prng.random() * 100);
 
     this.kills = 0;
     this.level = 1;
@@ -55,11 +57,11 @@ class Unit {
     const availableJobs = ['TREE_CHOPPER', 'MINER', 'HOUSE_BUILDER', 'ARMY_MAN'];
     if (town) {
       const unbuilt = town.buildings.filter(b => !b.isCompleted).length;
-      if (unbuilt > 0 && Math.random() < 0.4) {
+      if (unbuilt > 0 && CONFIG.prng.random() < 0.4) {
         return 'HOUSE_BUILDER';
       }
     }
-    return availableJobs[Math.floor(Math.random() * availableJobs.length)];
+    return availableJobs[Math.floor(CONFIG.prng.random() * availableJobs.length)];
   }
 
   setMoveTarget(tx, ty, world) {
@@ -228,24 +230,24 @@ class Unit {
   }
 
   updateChildAI(world, gameState) {
-    if (this.state === 'IDLE' && Math.random() < 0.08) {
+    if (this.state === 'IDLE' && CONFIG.prng.random() < 0.08) {
       const town = gameState.towns.find(t => t.id === this.townId);
       const centerX = town ? town.x : this.x;
       const centerY = town ? town.y : this.y;
-      const nx = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, Math.round(centerX + (Math.random() - 0.5) * 6)));
-      const ny = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - 1, Math.round(centerY + (Math.random() - 0.5) * 6)));
+      const nx = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, Math.round(centerX + (CONFIG.prng.random() - 0.5) * 6)));
+      const ny = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - 1, Math.round(centerY + (CONFIG.prng.random() - 0.5) * 6)));
       this.setMoveTarget(nx, ny, world);
     }
   }
 
   updateArmyManAI(world, gameState) {
     this.scanForEnemies(gameState);
-    if (this.state === 'IDLE' && Math.random() < 0.06) {
+    if (this.state === 'IDLE' && CONFIG.prng.random() < 0.06) {
       const town = gameState.towns.find(t => t.id === this.townId);
       const centerX = town ? town.x : this.x;
       const centerY = town ? town.y : this.y;
-      const nx = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, Math.round(centerX + (Math.random() - 0.5) * 12)));
-      const ny = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - 1, Math.round(centerY + (Math.random() - 0.5) * 12)));
+      const nx = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, Math.round(centerX + (CONFIG.prng.random() - 0.5) * 12)));
+      const ny = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - 1, Math.round(centerY + (CONFIG.prng.random() - 0.5) * 12)));
       this.setMoveTarget(nx, ny, world);
     }
   }
@@ -263,8 +265,8 @@ class Unit {
     const town = gameState.towns.find(t => t.id === this.townId || t.kingdomKey === this.kingdomKey);
 
     if (!town) {
-      if (this.state === 'IDLE' && Math.random() < 0.05) {
-        this.setMoveTarget(Math.round(this.x + (Math.random() - 0.5) * 6), Math.round(this.y + (Math.random() - 0.5) * 6), world);
+      if (this.state === 'IDLE' && CONFIG.prng.random() < 0.05) {
+        this.setMoveTarget(Math.round(this.x + (CONFIG.prng.random() - 0.5) * 6), Math.round(this.y + (CONFIG.prng.random() - 0.5) * 6), world);
       }
       return;
     }
@@ -283,7 +285,7 @@ class Unit {
               this.hasBuildingWood = true;
               this.setMoveTarget(unbuilt.x, unbuilt.y, world);
             }
-          } else if (this.state === 'IDLE' || Math.random() < 0.08) {
+          } else if (this.state === 'IDLE' || CONFIG.prng.random() < 0.08) {
             this.setMoveTarget(stockpile.x, stockpile.y, world);
           }
         }
@@ -295,13 +297,13 @@ class Unit {
         unbuilt.constructTick(25);
         this.hasBuildingWood = false;
         this.state = 'BUILDING';
-      } else if (this.state === 'IDLE' || Math.random() < 0.08) {
+      } else if (this.state === 'IDLE' || CONFIG.prng.random() < 0.08) {
         this.setMoveTarget(unbuilt.x, unbuilt.y, world);
       }
       return;
     }
 
-    if (town.resources.wood >= 20 && Math.random() < 0.05 && town.buildings.length < 15) {
+    if (town.resources.wood >= 20 && CONFIG.prng.random() < 0.05 && town.buildings.length < 15) {
       const spot = town.findBuildSpot(world);
       if (spot) {
         let bType = 'HOUSE';
@@ -323,9 +325,9 @@ class Unit {
       }
     }
 
-    if (this.state === 'IDLE' && Math.random() < 0.06) {
-      const nx = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, Math.round(town.x + (Math.random() - 0.5) * 8)));
-      const ny = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - 1, Math.round(town.y + (Math.random() - 0.5) * 8)));
+    if (this.state === 'IDLE' && CONFIG.prng.random() < 0.06) {
+      const nx = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - 1, Math.round(town.x + (CONFIG.prng.random() - 0.5) * 8)));
+      const ny = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - 1, Math.round(town.y + (CONFIG.prng.random() - 0.5) * 8)));
       this.setMoveTarget(nx, ny, world);
     }
   }
@@ -345,7 +347,7 @@ class Unit {
         }
         this.carryingWood = 0;
         this.state = 'IDLE';
-      } else if (this.state === 'IDLE' || Math.random() < 0.08) {
+      } else if (this.state === 'IDLE' || CONFIG.prng.random() < 0.08) {
         this.setMoveTarget(stockpile.x, stockpile.y, world);
       }
       return;
@@ -377,7 +379,7 @@ class Unit {
       }
     } else {
       this.releaseClaim();
-      if (this.state === 'IDLE' && Math.random() < 0.15) {
+      if (this.state === 'IDLE' && CONFIG.prng.random() < 0.15) {
         for (let dy = -6; dy <= 6; dy++) {
           for (let dx = -6; dx <= 6; dx++) {
             const nx = rx + dx;
@@ -428,7 +430,7 @@ class Unit {
       }
     } else {
       this.releaseClaim();
-      if (this.state === 'IDLE' && Math.random() < 0.15) {
+      if (this.state === 'IDLE' && CONFIG.prng.random() < 0.15) {
         for (let dy = -6; dy <= 6; dy++) {
           for (let dx = -6; dx <= 6; dx++) {
             const nx = rx + dx;

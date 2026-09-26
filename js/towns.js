@@ -44,7 +44,7 @@ class Town {
   }
 
   addBuilding(type, x, y) {
-    const bId = `b_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+    const bId = `b_${Math.floor(CONFIG.prng.random() * 100000000).toString(36)}`;
     const b = new Building(bId, type, x, y, this.ownerId, this.kingdomKey);
     this.buildings.push(b);
     return b;
@@ -98,22 +98,22 @@ class Town {
     }
 
     const barracks = this.buildings.filter(b => b.type === 'BARRACKS' && b.isCompleted);
-    if (barracks.length > 0 && this.resources.food >= 20 && this.resources.wood >= 10 && Math.random() < 0.06) {
+    if (barracks.length > 0 && this.resources.food >= 20 && this.resources.wood >= 10 && CONFIG.prng.random() < 0.06) {
       this.resources.food -= 20;
       this.resources.wood -= 10;
-      const unitType = Math.random() > 0.4 ? 'INFANTRY' : 'ARCHER';
-      const b = barracks[Math.floor(Math.random() * barracks.length)];
+      const unitType = CONFIG.prng.random() > 0.4 ? 'INFANTRY' : 'ARCHER';
+      const b = barracks[Math.floor(CONFIG.prng.random() * barracks.length)];
       gameState.spawnUnit(unitType, this.raceKey, b.x, b.y, this.ownerId, this.kingdomKey, this.id);
     }
 
     const docks = this.buildings.filter(b => b.type === 'DOCK' && b.isCompleted);
-    if (docks.length > 0 && this.resources.wood >= 50 && Math.random() < 0.03) {
+    if (docks.length > 0 && this.resources.wood >= 50 && CONFIG.prng.random() < 0.03) {
       this.resources.wood -= 50;
-      const dock = docks[Math.floor(Math.random() * docks.length)];
+      const dock = docks[Math.floor(CONFIG.prng.random() * docks.length)];
       gameState.spawnUnit('BOAT_CANNON', this.raceKey, dock.x, dock.y, this.ownerId, this.kingdomKey, this.id);
     }
 
-    if (this.resources.wood >= 30 && Math.random() < 0.04 && this.buildings.length < 15) {
+    if (this.resources.wood >= 30 && CONFIG.prng.random() < 0.04 && this.buildings.length < 15) {
       const unbuilt = this.buildings.some(b => !b.isCompleted);
       if (!unbuilt) {
         const spot = this.findBuildSpot(world);
@@ -150,7 +150,7 @@ class Town {
     const arr = Array.from(this.territory);
     const len = arr.length;
     for (let i = 0; i < 25; i++) {
-      const idx = arr[Math.floor(Math.random() * len)];
+      const idx = arr[Math.floor(CONFIG.prng.random() * len)];
       if (idx === undefined) continue;
       const x = idx % CONFIG.WORLD_WIDTH;
       const y = (idx / CONFIG.WORLD_WIDTH) | 0;

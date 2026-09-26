@@ -263,6 +263,7 @@
           const tool = btn.getAttribute('data-tool');
           if (tool && game) {
             game.activeTool = tool;
+            game.warSourceKingdom = null;
             toolLabel.innerText = btn.innerText;
           }
         });
