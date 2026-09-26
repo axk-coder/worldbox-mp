@@ -366,8 +366,28 @@ class WorldMap {
         if (nx < 0 || nx >= this.width || ny < 0 || ny >= this.height) continue;
         if (!this.isPassable(nx, ny, isNaval)) continue;
 
+        if (d >= 4) {
+          if (!this.isPassable(currX + dirsX[d], currY, isNaval) || !this.isPassable(currX, currY + dirsY[d], isNaval)) {
+            continue;
+          }
+        }
+
+        let waterPenalty = 0;
+        if (!isNaval) {
+          const t1 = this.getTile(nx + 1, ny);
+          const t2 = this.getTile(nx - 1, ny);
+          const t3 = this.getTile(nx, ny + 1);
+          const t4 = this.getTile(nx, ny - 1);
+          if (t1 === CONFIG.TILES.DEEP_WATER || t1 === CONFIG.TILES.SHALLOW_WATER ||
+              t2 === CONFIG.TILES.DEEP_WATER || t2 === CONFIG.TILES.SHALLOW_WATER ||
+              t3 === CONFIG.TILES.DEEP_WATER || t3 === CONFIG.TILES.SHALLOW_WATER ||
+              t4 === CONFIG.TILES.DEEP_WATER || t4 === CONFIG.TILES.SHALLOW_WATER) {
+            waterPenalty = 3.5;
+          }
+        }
+
         const nIdx = ny * this.width + nx;
-        const stepDist = d >= 4 ? 1.4 : 1.0;
+        const stepDist = (d >= 4 ? 1.4 : 1.0) + waterPenalty;
         const newG = currG + stepDist;
 
         if (this.visited[nIdx] !== currentSearchId || newG < this.gScore[nIdx]) {
