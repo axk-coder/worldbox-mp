@@ -53,22 +53,33 @@ class WorldMap {
         if (heightVal < 0.22) {
           this.tiles[idx] = CONFIG.TILES.DEEP_WATER;
           this.waterVolume[idx] = 2.5;
+          if (this.random() < 0.08) {
+            this.resources[idx] = { type: CONFIG.RESOURCES.FOOD, nodeType: 'FISH', amount: 150 };
+          }
         } else if (heightVal < 0.32) {
           this.tiles[idx] = CONFIG.TILES.SHALLOW_WATER;
           this.waterVolume[idx] = 1.0;
+          if (this.random() < 0.05) {
+            this.resources[idx] = { type: CONFIG.RESOURCES.FOOD, nodeType: 'FISH', amount: 120 };
+          }
         } else if (heightVal < 0.38) {
           this.tiles[idx] = CONFIG.TILES.SAND;
         } else if (heightVal < 0.70) {
           this.tiles[idx] = CONFIG.TILES.GRASS;
           const moisture = (this.noise.noise2D(x * 0.05 + 100, y * 0.05 + 100) + 1) / 2;
           if (moisture > 0.58 && this.random() < 0.35) {
-            this.resources[idx] = { type: CONFIG.RESOURCES.WOOD, amount: 150 };
+            this.resources[idx] = { type: CONFIG.RESOURCES.WOOD, nodeType: 'TREE', amount: 150 };
             this.tiles[idx] = CONFIG.TILES.FOREST;
           }
         } else if (heightVal < 0.86) {
           this.tiles[idx] = CONFIG.TILES.MOUNTAIN;
-          if (this.random() < 0.15) {
-            this.resources[idx] = { type: CONFIG.RESOURCES.STONE, amount: 200 };
+          const rVal = this.random();
+          if (rVal < 0.15) {
+            this.resources[idx] = { type: CONFIG.RESOURCES.STONE_ROCK, nodeType: 'STONE_ROCK', amount: 200 };
+          } else if (rVal < 0.20) {
+            this.resources[idx] = { type: CONFIG.RESOURCES.GOLD_ORE, nodeType: 'GOLD_ORE', amount: 150 };
+          } else if (rVal < 0.25) {
+            this.resources[idx] = { type: CONFIG.RESOURCES.IRON_ORE, nodeType: 'IRON_ORE', amount: 150 };
           }
         } else {
           this.tiles[idx] = CONFIG.TILES.SNOW;
@@ -125,11 +136,18 @@ class WorldMap {
             this.kingdomOwner[idx] = null;
           } else if (tool === 'PLANT_FOREST') {
             this.tiles[idx] = CONFIG.TILES.FOREST;
-            this.resources[idx] = { type: CONFIG.RESOURCES.WOOD, amount: 150 };
+            this.resources[idx] = { type: CONFIG.RESOURCES.WOOD, nodeType: 'TREE', amount: 150 };
           } else if (tool === 'BUILD_MOUNTAIN') {
             this.heightMap[idx] = Math.min(1.0, this.heightMap[idx] + 0.4);
             this.tiles[idx] = CONFIG.TILES.MOUNTAIN;
-            this.resources[idx] = { type: CONFIG.RESOURCES.STONE, amount: 200 };
+            const rVal = this.random();
+            if (rVal < 0.5) {
+              this.resources[idx] = { type: CONFIG.RESOURCES.STONE_ROCK, nodeType: 'STONE_ROCK', amount: 200 };
+            } else if (rVal < 0.75) {
+              this.resources[idx] = { type: CONFIG.RESOURCES.GOLD_ORE, nodeType: 'GOLD_ORE', amount: 150 };
+            } else {
+              this.resources[idx] = { type: CONFIG.RESOURCES.IRON_ORE, nodeType: 'IRON_ORE', amount: 150 };
+            }
           } else if (tool === 'ADD_SHALLOW_WATER') {
             this.waterVolume[idx] += 1.0;
             this.tiles[idx] = CONFIG.TILES.SHALLOW_WATER;
@@ -250,6 +268,43 @@ class WorldMap {
   getResource(x, y) {
     if (x < 0 || x >= this.width || y < 0 || y >= this.height) return null;
     return this.resources[y * this.width + x];
+  }
+
+  findWaterNear(x, y) {
+    const dirs = [
+      {x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1},
+      {x:1,y:1},{x:-1,y:-1},{x:1,y:-1},{x:-1,y:1},
+      {x:2,y:0},{x:-2,y:0},{x:0,y:2},{x:0,y:-2},
+      {x:2,y:1},{x:2,y:-1},{x:-2,y:1},{x:-2,y:-1},
+      {x:1,y:2},{x:-1,y:2},{x:1,y:-2},{x:-1,y:-2}
+    ];
+    for (let i = 0; i < dirs.length; i++) {
+      const nx = x + dirs[i].x;
+      const ny = y + dirs[i].y;
+      const t = this.getTile(nx, ny);
+      if (t === CONFIG.TILES.DEEP_WATER || t === CONFIG.TILES.SHALLOW_WATER) {
+        return { x: nx, y: ny };
+      }
+    }
+    return null;
+  }
+
+  findNearestPassableTile(cx, cy, isNaval = false, maxRadius = 3) {
+    if (this.isPassable(cx, cy, isNaval)) return { x: cx, y: cy };
+    for (let r = 1; r <= maxRadius; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.abs(dx) === r || Math.abs(dy) === r) {
+            const nx = cx + dx;
+            const ny = cy + dy;
+            if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height && this.isPassable(nx, ny, isNaval)) {
+              return { x: nx, y: ny };
+            }
+          }
+        }
+      }
+    }
+    return null;
   }
 
   isPassable(x, y, isNaval = false) {

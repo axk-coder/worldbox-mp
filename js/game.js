@@ -86,6 +86,7 @@ class GameEngine {
     this.units = [];
     this.projectiles = [];
     this.fx = [];
+    this.activeWars = new Set();
     this.socketManager = new MultiSocketManager();
     this.playerId = `player_${Math.floor(Math.random() * 9000 + 1000)}`;
     this.playerKingdom = 'blue';
@@ -169,12 +170,31 @@ class GameEngine {
     this.camera.y = (ty * CONFIG.TILE_SIZE * this.camera.zoom) - (this.canvas.height / 2);
   }
 
+  chooseNewCapital(kingdomKey) {
+    if (!kingdomKey) return null;
+    const activeTowns = this.towns.filter(t => t.kingdomKey === kingdomKey && !t.isRuined && t.buildings.some(b => !b.isRuined));
+    if (activeTowns.length === 0) return null;
+    activeTowns.forEach(t => t.isCapital = false);
+    activeTowns.sort((a, b) => {
+      const popA = this.getTownUnitsCount(a.id);
+      const popB = this.getTownUnitsCount(b.id);
+      if (popB !== popA) return popB - popA;
+      const bCountA = a.buildings.filter(b => !b.isRuined).length;
+      const bCountB = b.buildings.filter(b => !b.isRuined).length;
+      if (bCountB !== bCountA) return bCountB - bCountA;
+      return a.id.localeCompare(b.id);
+    });
+    activeTowns[0].isCapital = true;
+    return activeTowns[0];
+  }
+
   findNearbyKingdom(x, y, radius = 16) {
     let closestKingdomKey = null;
     let closestTown = null;
     let minDist = radius + 1;
 
     for (let t of this.towns) {
+      if (t.isRuined) continue;
       const dist = Math.hypot(t.x - x, t.y - y);
       if (dist <= radius && dist < minDist) {
         minDist = dist;
@@ -197,7 +217,7 @@ class GameEngine {
             if (dist <= radius && dist < minDist) {
               minDist = dist;
               closestKingdomKey = kKey;
-              closestTown = this.towns.find(t => t.kingdomKey === kKey) || null;
+              closestTown = this.towns.find(t => t.kingdomKey === kKey && !t.isRuined) || null;
             }
           }
         }
@@ -219,8 +239,9 @@ class GameEngine {
     const kingdomName = name || this.generateKingdomName(raceKey);
     CONFIG.registerKingdom(kingdomKey, kingdomName, raceKey);
 
+    const isFirstTown = !this.towns.some(t => t.kingdomKey === kingdomKey && !t.isRuined);
     const tId = `t_${Math.floor(CONFIG.prng.random() * 100000000).toString(36)}`;
-    const town = new Town(tId, kingdomName, raceKey, x, y, this.playerId, kingdomKey);
+    const town = new Town(tId, kingdomName, raceKey, x, y, this.playerId, kingdomKey, isFirstTown);
     this.towns.push(town);
 
     for (let i = 0; i < 2; i++) {
@@ -235,8 +256,8 @@ class GameEngine {
     if (!this.world.isPassable(x, y, isNaval)) return null;
 
     if (!townId && !isNaval) {
-      if (kingdomKey && this.towns.some(t => t.kingdomKey === kingdomKey)) {
-        const existingTown = this.towns.find(t => t.kingdomKey === kingdomKey);
+      if (kingdomKey && this.towns.some(t => t.kingdomKey === kingdomKey && !t.isRuined)) {
+        const existingTown = this.towns.find(t => t.kingdomKey === kingdomKey && !t.isRuined);
         if (existingTown) townId = existingTown.id;
       } else {
         const nearby = this.findNearbyKingdom(x, y, 16);
@@ -245,7 +266,7 @@ class GameEngine {
           if (nearby.town) {
             townId = nearby.town.id;
           } else {
-            const existingTown = this.towns.find(t => t.kingdomKey === kingdomKey);
+            const existingTown = this.towns.find(t => t.kingdomKey === kingdomKey && !t.isRuined);
             if (existingTown) {
               townId = existingTown.id;
             } else {
@@ -277,11 +298,24 @@ class GameEngine {
     return unit;
   }
 
+  isAtWar(k1, k2) {
+    if (!k1 || !k2 || k1 === k2) return false;
+    if (this.activeWars && this.activeWars.size > 0) {
+      const pairKey = [k1, k2].sort().join(':');
+      if (this.activeWars.has(pairKey)) return true;
+    }
+    return true;
+  }
+
   initiateWar(sourceKingdomKey, targetKingdomKey) {
     if (!sourceKingdomKey || !targetKingdomKey || sourceKingdomKey === targetKingdomKey) return;
 
-    const targetTown = this.towns.find(t => t.kingdomKey === targetKingdomKey);
-    const sourceTown = this.towns.find(t => t.kingdomKey === sourceKingdomKey);
+    if (!this.activeWars) this.activeWars = new Set();
+    const pairKey = [sourceKingdomKey, targetKingdomKey].sort().join(':');
+    this.activeWars.add(pairKey);
+
+    const targetTown = this.towns.find(t => t.kingdomKey === targetKingdomKey && !t.isRuined);
+    const sourceTown = this.towns.find(t => t.kingdomKey === sourceKingdomKey && !t.isRuined);
     const targetX = targetTown ? targetTown.x : CONFIG.WORLD_WIDTH / 2;
     const targetY = targetTown ? targetTown.y : CONFIG.WORLD_HEIGHT / 2;
     const sourceX = sourceTown ? sourceTown.x : CONFIG.WORLD_WIDTH / 2;
@@ -295,14 +329,14 @@ class GameEngine {
 
     sourceUnits.forEach(u => {
       if (enemyInTarget) {
-        u.attackTarget = enemyInTarget;
+        u.attackTarget = enemyInSource ? enemyInTarget : null;
       }
       u.setMoveTarget(Math.floor(targetX), Math.floor(targetY), this.world);
     });
 
     targetUnits.forEach(u => {
       if (enemyInSource) {
-        u.attackTarget = enemyInSource;
+        u.attackTarget = enemyInTarget ? enemyInSource : null;
       }
       u.setMoveTarget(Math.floor(sourceX), Math.floor(sourceY), this.world);
     });
@@ -494,6 +528,7 @@ class GameEngine {
       falloutB64: this.encodeBytesToBase64(this.world.fallout),
       resources: this.world.resources,
       kingdomOwner: this.world.kingdomOwner,
+      activeWars: Array.from(this.activeWars || []),
       towns: this.towns.map(t => ({
         id: t.id,
         name: t.name,
@@ -502,8 +537,15 @@ class GameEngine {
         y: t.y,
         ownerId: t.ownerId,
         kingdomKey: t.kingdomKey,
+        isCapital: t.isCapital || false,
+        isRuined: t.isRuined || false,
+        siegeTimer: t.siegeTimer || 0,
+        siegeDuration: t.siegeDuration || 0,
+        siegeAttackerKingdom: t.siegeAttackerKingdom || null,
         wood: t.resources.wood,
         stone: t.resources.stone,
+        gold: t.resources.gold,
+        iron: t.resources.iron || 0,
         food: t.resources.food,
         territory: Array.from(t.territory || []),
         buildings: (t.buildings || []).map(b => ({
@@ -513,7 +555,9 @@ class GameEngine {
           y: b.y,
           hp: b.hp,
           maxHp: b.maxHp,
+          tier: b.tier || 0,
           isCompleted: b.isCompleted,
+          isRuined: b.isRuined || false,
           progress: b.progress
         }))
       })),
@@ -534,8 +578,15 @@ class GameEngine {
         kills: u.kills,
         state: u.state,
         carryingWood: u.carryingWood,
+        carryingStone: u.carryingStone,
+        carryingGold: u.carryingGold,
+        carryingIron: u.carryingIron,
+        carryingFood: u.carryingFood,
         hasBuildingWood: u.hasBuildingWood,
-        isNaval: u.isNaval
+        isNaval: u.isNaval,
+        siegeTimer: u.siegeTimer || 0,
+        siegeDuration: u.siegeDuration || 0,
+        siegeTargetTownId: u.siegeTargetTownId || null
       })),
       projectiles: this.projectiles.map(p => ({
         id: p.id,
@@ -605,22 +656,40 @@ class GameEngine {
     if (snapshot.kingdomOwner) {
       this.world.kingdomOwner = snapshot.kingdomOwner;
     }
+    if (snapshot.activeWars) {
+      this.activeWars = new Set(snapshot.activeWars);
+    }
 
     if (snapshot.towns) {
       const existingTownMap = new Map(this.towns.map(t => [t.id, t]));
       this.towns = snapshot.towns.map(tData => {
         let town = existingTownMap.get(tData.id);
         if (!town) {
-          town = new Town(tData.id, tData.name, tData.raceKey, tData.x, tData.y, tData.ownerId, tData.kingdomKey);
+          town = new Town(tData.id, tData.name, tData.raceKey, tData.x, tData.y, tData.ownerId, tData.kingdomKey, tData.isCapital);
         }
         town.name = tData.name;
         town.x = tData.x;
         town.y = tData.y;
+        town.isCapital = tData.isCapital || false;
+        town.isRuined = tData.isRuined || false;
+        town.siegeTimer = tData.siegeTimer || 0;
+        town.siegeDuration = tData.siegeDuration || 0;
+        town.siegeAttackerKingdom = tData.siegeAttackerKingdom || null;
         town.resources.wood = tData.wood || 0;
         town.resources.stone = tData.stone || 0;
+        town.resources.gold = tData.gold || 0;
+        town.resources.iron = tData.iron || 0;
         town.resources.food = tData.food || 0;
         town.territory = new Set(tData.territory || []);
-        town.buildings = tData.buildings || [];
+        town.buildings = (tData.buildings || []).map(bData => {
+          const b = new Building(bData.id, bData.type, bData.x, bData.y, tData.ownerId, tData.kingdomKey, bData.tier || 0);
+          b.hp = bData.hp;
+          b.maxHp = bData.maxHp;
+          b.isCompleted = bData.isCompleted;
+          b.isRuined = bData.isRuined || false;
+          b.progress = bData.progress;
+          return b;
+        });
         return town;
       });
     }
@@ -651,12 +720,19 @@ class GameEngine {
         unit.job = uData.job;
         unit.state = uData.state || 'IDLE';
         unit.carryingWood = uData.carryingWood || 0;
+        unit.carryingStone = uData.carryingStone || 0;
+        unit.carryingGold = uData.carryingGold || 0;
+        unit.carryingIron = uData.carryingIron || 0;
+        unit.carryingFood = uData.carryingFood || 0;
         unit.hasBuildingWood = uData.hasBuildingWood || false;
         unit.level = uData.level || 1;
         unit.kills = uData.kills || 0;
         unit.isNaval = uData.isNaval || false;
         unit.kingdomKey = uData.kingdomKey;
         unit.townId = uData.townId;
+        unit.siegeTimer = uData.siegeTimer || 0;
+        unit.siegeDuration = uData.siegeDuration || 0;
+        unit.siegeTargetTownId = uData.siegeTargetTownId || null;
         return unit;
       });
     }
@@ -687,7 +763,7 @@ class GameEngine {
     const popEl = document.getElementById('stat-population');
     if (popEl) popEl.innerText = this.units.length;
     const kgEl = document.getElementById('stat-kingdoms');
-    if (kgEl) kgEl.innerText = this.towns.length;
+    if (kgEl) kgEl.innerText = this.towns.filter(t => !t.isRuined).length;
   }
 
   saveGame() {
@@ -706,6 +782,7 @@ class GameEngine {
         fallout: Array.from(this.world.fallout),
         kingdomOwner: this.world.kingdomOwner
       },
+      activeWars: Array.from(this.activeWars || []),
       towns: this.towns.map(t => ({
         id: t.id,
         name: t.name,
@@ -714,8 +791,15 @@ class GameEngine {
         y: t.y,
         ownerId: t.ownerId,
         kingdomKey: t.kingdomKey,
+        isCapital: t.isCapital || false,
+        isRuined: t.isRuined || false,
+        siegeTimer: t.siegeTimer || 0,
+        siegeDuration: t.siegeDuration || 0,
+        siegeAttackerKingdom: t.siegeAttackerKingdom || null,
         wood: t.resources.wood,
         stone: t.resources.stone,
+        gold: t.resources.gold,
+        iron: t.resources.iron || 0,
         food: t.resources.food,
         territory: Array.from(t.territory || []),
         buildings: (t.buildings || []).map(b => ({
@@ -725,7 +809,9 @@ class GameEngine {
           y: b.y,
           hp: b.hp,
           maxHp: b.maxHp,
+          tier: b.tier || 0,
           isCompleted: b.isCompleted,
+          isRuined: b.isRuined || false,
           progress: b.progress
         }))
       })),
@@ -744,7 +830,16 @@ class GameEngine {
         job: u.job,
         level: u.level,
         kills: u.kills,
-        stats: u.stats
+        stats: u.stats,
+        carryingWood: u.carryingWood || 0,
+        carryingStone: u.carryingStone || 0,
+        carryingGold: u.carryingGold || 0,
+        carryingIron: u.carryingIron || 0,
+        carryingFood: u.carryingFood || 0,
+        hasBuildingWood: u.hasBuildingWood || false,
+        siegeTimer: u.siegeTimer || 0,
+        siegeDuration: u.siegeDuration || 0,
+        siegeTargetTownId: u.siegeTargetTownId || null
       }))
     };
 
@@ -769,6 +864,7 @@ class GameEngine {
       Object.assign(CONFIG.KINGDOM_COLORS, saveData.kingdomColors);
     }
 
+    this.activeWars = new Set(saveData.activeWars || []);
     this.world.width = saveData.world.width;
     this.world.height = saveData.world.height;
     this.world.seed = saveData.world.seed;
@@ -780,21 +876,27 @@ class GameEngine {
     this.world.kingdomOwner = saveData.world.kingdomOwner;
 
     this.towns = (saveData.towns || []).map(tData => {
-      const town = new Town(tData.id, tData.name, tData.raceKey, tData.x, tData.y, tData.ownerId, tData.kingdomKey);
+      const town = new Town(tData.id, tData.name, tData.raceKey, tData.x, tData.y, tData.ownerId, tData.kingdomKey, tData.isCapital);
+      town.isCapital = tData.isCapital || false;
+      town.isRuined = tData.isRuined || false;
+      town.siegeTimer = tData.siegeTimer || 0;
+      town.siegeDuration = tData.siegeDuration || 0;
+      town.siegeAttackerKingdom = tData.siegeAttackerKingdom || null;
       town.resources.wood = tData.wood || 40;
       town.resources.stone = tData.stone || 20;
+      town.resources.gold = tData.gold || 20;
+      town.resources.iron = tData.iron || 0;
       town.resources.food = tData.food || 60;
       town.territory = new Set(tData.territory || []);
-      town.buildings = (tData.buildings || []).map(bData => ({
-        id: bData.id,
-        type: bData.type,
-        x: bData.x,
-        y: bData.y,
-        hp: bData.hp,
-        maxHp: bData.maxHp,
-        isCompleted: bData.isCompleted,
-        progress: bData.progress
-      }));
+      town.buildings = (tData.buildings || []).map(bData => {
+        const b = new Building(bData.id, bData.type, bData.x, bData.y, tData.ownerId, tData.kingdomKey, bData.tier || 0);
+        b.hp = bData.hp;
+        b.maxHp = bData.maxHp;
+        b.isCompleted = bData.isCompleted;
+        b.isRuined = bData.isRuined || false;
+        b.progress = bData.progress;
+        return b;
+      });
       return town;
     });
 
@@ -804,6 +906,15 @@ class GameEngine {
       unit.maxHp = uData.maxHp;
       unit.level = uData.level;
       unit.kills = uData.kills;
+      unit.carryingWood = uData.carryingWood || 0;
+      unit.carryingStone = uData.carryingStone || 0;
+      unit.carryingGold = uData.carryingGold || 0;
+      unit.carryingIron = uData.carryingIron || 0;
+      unit.carryingFood = uData.carryingFood || 0;
+      unit.hasBuildingWood = uData.hasBuildingWood || false;
+      unit.siegeTimer = uData.siegeTimer || 0;
+      unit.siegeDuration = uData.siegeDuration || 0;
+      unit.siegeTargetTownId = uData.siegeTargetTownId || null;
       if (uData.stats) unit.stats = uData.stats;
       return unit;
     });
@@ -994,7 +1105,13 @@ class GameEngine {
 
     document.getElementById('inspect-name').innerText = unit.name;
     document.getElementById('inspect-race').innerText = CONFIG.RACES[unit.raceKey] ? CONFIG.RACES[unit.raceKey].name : unit.raceKey;
-    document.getElementById('inspect-kingdom').innerText = CONFIG.KINGDOM_COLORS[unit.kingdomKey] ? CONFIG.KINGDOM_COLORS[unit.kingdomKey].name : unit.kingdomKey;
+    
+    const town = this.towns.find(t => t.id === unit.townId);
+    let kingdomLabel = CONFIG.KINGDOM_COLORS[unit.kingdomKey] ? CONFIG.KINGDOM_COLORS[unit.kingdomKey].name : unit.kingdomKey;
+    if (town && town.isCapital) {
+      kingdomLabel += ' (Capital)';
+    }
+    document.getElementById('inspect-kingdom').innerText = kingdomLabel;
     document.getElementById('inspect-age').innerText = `${unit.age} years old`;
     const jobConfig = CONFIG.JOBS ? CONFIG.JOBS[unit.job] : null;
     document.getElementById('inspect-job').innerText = jobConfig ? jobConfig.name : (unit.job || 'Worker');
@@ -1017,7 +1134,11 @@ class GameEngine {
     }
 
     const raceName = CONFIG.RACES[unit.raceKey] ? CONFIG.RACES[unit.raceKey].name : unit.raceKey;
-    const kingdomName = CONFIG.KINGDOM_COLORS[unit.kingdomKey] ? CONFIG.KINGDOM_COLORS[unit.kingdomKey].name : unit.kingdomKey;
+    let kingdomName = CONFIG.KINGDOM_COLORS[unit.kingdomKey] ? CONFIG.KINGDOM_COLORS[unit.kingdomKey].name : unit.kingdomKey;
+    const town = this.towns.find(t => t.id === unit.townId);
+    if (town && town.isCapital) {
+      kingdomName += ' [Capital]';
+    }
     const jobName = CONFIG.JOBS && CONFIG.JOBS[unit.job] ? CONFIG.JOBS[unit.job].name : (unit.job || 'Worker');
 
     document.getElementById('tooltip-name').innerText = unit.name;
@@ -1124,7 +1245,7 @@ class GameEngine {
           const tile = this.world.getTile(rx, ry);
           if (tile === CONFIG.TILES.GRASS && CONFIG.prng.random() < 0.15) {
             this.world.setTile(rx, ry, CONFIG.TILES.FOREST);
-            this.world.resources[ry * this.world.width + rx] = { type: CONFIG.RESOURCES.WOOD, amount: 150 };
+            this.world.resources[ry * this.world.width + rx] = { type: CONFIG.RESOURCES.WOOD, nodeType: 'TREE', amount: 150 };
           } else if (tile === CONFIG.TILES.CRATER) {
             this.world.setTile(rx, ry, CONFIG.TILES.GRASS);
           }
@@ -1155,6 +1276,14 @@ class GameEngine {
         this.units = this.units.filter(u => u.hp > 0);
         this.projectiles.forEach(p => p.update(this.world, this));
         this.projectiles = this.projectiles.filter(p => !p.completed);
+
+        const activeKingdomKeys = new Set(this.towns.filter(t => !t.isRuined && t.buildings.length > 0).map(t => t.kingdomKey));
+        activeKingdomKeys.forEach(kKey => {
+          const kTowns = this.towns.filter(t => t.kingdomKey === kKey && !t.isRuined && t.buildings.length > 0);
+          if (kTowns.length > 0 && !kTowns.some(t => t.isCapital)) {
+            this.chooseNewCapital(kKey);
+          }
+        });
 
         this.fx.forEach(f => f.life -= 1 / (CONFIG.TICKS_PER_SEC * f.maxLife));
         this.fx = this.fx.filter(f => f.life > 0);
@@ -1285,11 +1414,26 @@ class GameEngine {
             glR.pushQuad(wx, wy, tileSize, tileSize, 0.55, 0.9, 0.3, falloutVal / 350);
           }
 
-          if (tile === CONFIG.TILES.FOREST) {
-            glR.pushQuad(wx + tileSize * 0.2, wy + tileSize * 0.8, tileSize * 0.6, tileSize * 0.2, 0.0, 0.0, 0.0, 0.25);
-            glR.pushQuad(wx + tileSize * 0.4, wy + tileSize * 0.5, tileSize * 0.2, tileSize * 0.4, 0.36, 0.25, 0.22, 1.0);
-            glR.pushQuad(wx + tileSize * 0.15, wy + tileSize * 0.1, tileSize * 0.7, tileSize * 0.5, 0.18, 0.49, 0.2, 1.0);
-            glR.pushQuad(wx + tileSize * 0.25, wy + tileSize * 0.2, tileSize * 0.5, tileSize * 0.3, 0.11, 0.37, 0.13, 1.0);
+          const resNode = this.world.resources[idx];
+          if (resNode) {
+            if (resNode.nodeType === 'TREE' || tile === CONFIG.TILES.FOREST) {
+              glR.pushQuad(wx + tileSize * 0.2, wy + tileSize * 0.8, tileSize * 0.6, tileSize * 0.2, 0.0, 0.0, 0.0, 0.25);
+              glR.pushQuad(wx + tileSize * 0.4, wy + tileSize * 0.5, tileSize * 0.2, tileSize * 0.4, 0.36, 0.25, 0.22, 1.0);
+              glR.pushQuad(wx + tileSize * 0.15, wy + tileSize * 0.1, tileSize * 0.7, tileSize * 0.5, 0.18, 0.49, 0.2, 1.0);
+              glR.pushQuad(wx + tileSize * 0.25, wy + tileSize * 0.2, tileSize * 0.5, tileSize * 0.3, 0.11, 0.37, 0.13, 1.0);
+            } else if (resNode.nodeType === 'STONE_ROCK') {
+              glR.pushQuad(wx + tileSize * 0.25, wy + tileSize * 0.3, tileSize * 0.5, tileSize * 0.5, 0.45, 0.47, 0.5, 1.0);
+              glR.pushQuad(wx + tileSize * 0.3, wy + tileSize * 0.2, tileSize * 0.4, tileSize * 0.2, 0.6, 0.62, 0.65, 1.0);
+            } else if (resNode.nodeType === 'GOLD_ORE') {
+              glR.pushQuad(wx + tileSize * 0.25, wy + tileSize * 0.3, tileSize * 0.5, tileSize * 0.5, 0.45, 0.47, 0.5, 1.0);
+              glR.pushQuad(wx + tileSize * 0.35, wy + tileSize * 0.35, tileSize * 0.2, tileSize * 0.2, 0.9, 0.75, 0.1, 1.0);
+            } else if (resNode.nodeType === 'IRON_ORE') {
+              glR.pushQuad(wx + tileSize * 0.25, wy + tileSize * 0.3, tileSize * 0.5, tileSize * 0.5, 0.35, 0.37, 0.4, 1.0);
+              glR.pushQuad(wx + tileSize * 0.35, wy + tileSize * 0.35, tileSize * 0.2, tileSize * 0.2, 0.7, 0.3, 0.2, 1.0);
+            } else if (resNode.nodeType === 'FISH') {
+              glR.pushQuad(wx + tileSize * 0.3, wy + tileSize * 0.4, tileSize * 0.4, tileSize * 0.2, 0.3, 0.7, 0.9, 0.8);
+              glR.pushQuad(wx + tileSize * 0.55, wy + tileSize * 0.35, tileSize * 0.2, tileSize * 0.3, 0.2, 0.5, 0.8, 0.8);
+            }
           }
         }
       }
@@ -1302,6 +1446,12 @@ class GameEngine {
           const wx = b.x * tileSize;
           const wy = b.y * tileSize;
 
+          if (town.isRuined) {
+            glR.pushQuad(wx + 2, wy + 4, tileSize - 4, tileSize - 6, 0.2, 0.2, 0.2, 0.6);
+            glR.pushQuad(wx + 4, wy + 8, tileSize - 8, tileSize - 10, 0.1, 0.1, 0.1, 0.8);
+            return;
+          }
+
           if (!b.isCompleted) {
             glR.pushQuad(wx + 2, wy + 4, tileSize - 4, tileSize - 6, 0.55, 0.43, 0.39, 1.0);
             glR.pushQuad(wx, wy - 5, tileSize, 4, 0.07, 0.07, 0.07, 1.0);
@@ -1311,13 +1461,45 @@ class GameEngine {
             glR.pushQuad(wx + 2, wy + 8, tileSize - 4, tileSize - 8, 0.45, 0.32, 0.22, 1.0);
             glR.pushQuad(wx + 3, wy + 4, tileSize - 6, 4, 0.55, 0.43, 0.39, 1.0);
             glR.pushQuad(wx + 4, wy + 1, tileSize - 8, 3, 0.65, 0.52, 0.45, 1.0);
+          } else if (b.isHouse || b.type === 'HOUSE' || b.type === 'TENT' || b.type === 'SMALL_HOUSE' || b.type === 'MID_HOUSE' || b.type === 'BIG_HOUSE' || b.type === 'MANSION') {
+            glR.pushQuad(wx + 3, wy + tileSize * 0.7, tileSize - 4, tileSize * 0.25, 0.0, 0.0, 0.0, 0.3);
+            const tier = b.tier || 0;
+            if (tier === 0) {
+              glR.pushQuad(wx + 3, wy + 6, tileSize - 6, tileSize - 8, 0.82, 0.75, 0.6, 1.0);
+              glR.pushQuad(wx + 4, wy + 2, tileSize - 8, 5, 0.65, 0.55, 0.4, 1.0);
+            } else if (tier === 1) {
+              glR.pushQuad(wx + 2, wy + 4, tileSize - 4, tileSize - 6, 0.45, 0.32, 0.22, 1.0);
+              glR.pushQuad(wx + 1, wy, tileSize - 2, tileSize * 0.4, kCol[0], kCol[1], kCol[2], 1.0);
+            } else if (tier === 2) {
+              glR.pushQuad(wx + 2, wy + 8, tileSize - 4, tileSize - 10, 0.5, 0.52, 0.55, 1.0);
+              glR.pushQuad(wx + 2, wy + 3, tileSize - 4, 6, 0.45, 0.32, 0.22, 1.0);
+              glR.pushQuad(wx + 1, wy - 1, tileSize - 2, tileSize * 0.35, kCol[0], kCol[1], kCol[2], 1.0);
+            } else if (tier === 3) {
+              glR.pushQuad(wx + 1, wy + 4, tileSize - 2, tileSize - 6, 0.4, 0.42, 0.45, 1.0);
+              glR.pushQuad(wx, wy - 2, tileSize, tileSize * 0.4, kCol[0], kCol[1], kCol[2], 1.0);
+            } else {
+              glR.pushQuad(wx, wy + 2, tileSize, tileSize - 4, 0.3, 0.32, 0.35, 1.0);
+              glR.pushQuad(wx - 1, wy - 4, tileSize + 2, tileSize * 0.45, kCol[0], kCol[1], kCol[2], 1.0);
+              glR.pushQuad(wx + tileSize * 0.35, wy - 7, tileSize * 0.3, 4, 0.9, 0.8, 0.2, 1.0);
+            }
           } else {
             glR.pushQuad(wx + 3, wy + tileSize * 0.7, tileSize - 4, tileSize * 0.25, 0.0, 0.0, 0.0, 0.3);
             glR.pushQuad(wx + 2, wy + 4, tileSize - 4, tileSize - 6, 0.26, 0.26, 0.26, 1.0);
             glR.pushQuad(wx + 1, wy, tileSize - 2, tileSize * 0.4, kCol[0], kCol[1], kCol[2], 1.0);
             glR.pushQuad(wx + tileSize * 0.4, wy + tileSize * 0.6, tileSize * 0.2, tileSize * 0.35, 0.07, 0.07, 0.07, 1.0);
           }
+
+          if (town.isCapital && b.type === 'TOWN_HALL') {
+            glR.pushQuad(wx + tileSize * 0.3, wy - 8, tileSize * 0.4, 6, 1.0, 0.84, 0.0, 1.0);
+          }
         });
+
+        if (town.siegeTimer > 0 && town.siegeDuration > 0) {
+          const wx = town.x * tileSize;
+          const wy = town.y * tileSize;
+          glR.pushQuad(wx - 4, wy - 10, tileSize + 8, 4, 0.0, 0.0, 0.0, 0.8);
+          glR.pushQuad(wx - 4, wy - 10, (tileSize + 8) * (town.siegeTimer / town.siegeDuration), 4, 0.9, 0.1, 0.1, 1.0);
+        }
       });
 
       this.units.forEach(u => {
@@ -1332,7 +1514,13 @@ class GameEngine {
 
         glR.pushQuad(wx + tileSize * 0.2, wy + tileSize * 0.8, renderSize * 0.6, renderSize * 0.2, 0.0, 0.0, 0.0, 0.35);
 
-        if (u.isNaval) {
+        if (u.type === 'FISHING_BOAT') {
+          glR.pushQuad(wx + 2, wy + tileSize * 0.4, tileSize - 4, tileSize * 0.3, 0.55, 0.43, 0.39, 1.0);
+          glR.pushQuad(wx + tileSize * 0.4, wy + tileSize * 0.15, tileSize * 0.2, tileSize * 0.35, 0.8, 0.8, 0.8, 1.0);
+        } else if (u.type === 'FISHERMAN') {
+          glR.pushQuad(wx + 2, wy + tileSize * 0.35, tileSize - 4, tileSize * 0.35, 0.45, 0.38, 0.32, 1.0);
+          glR.pushQuad(wx + tileSize * 0.3, wy + tileSize * 0.15, tileSize * 0.4, tileSize * 0.3, 0.9, 0.9, 0.9, 1.0);
+        } else if (u.isNaval) {
           glR.pushQuad(wx + 2, wy + tileSize * 0.3, tileSize - 4, tileSize * 0.4, 0.22, 0.28, 0.31, 1.0);
           glR.pushQuad(wx + tileSize * 0.35, wy + tileSize * 0.1, tileSize * 0.3, tileSize * 0.25, rCol[0], rCol[1], rCol[2], 1.0);
         } else {
@@ -1347,11 +1535,29 @@ class GameEngine {
             glR.pushQuad(wx + renderSize * 0.7, wy + offsetY + renderSize * 0.35, renderSize * 0.15, renderSize * 0.3, 0.55, 0.43, 0.39, 1.0);
           } else if (u.job === 'HOUSE_BUILDER') {
             glR.pushQuad(wx + renderSize * 0.7, wy + offsetY + renderSize * 0.35, renderSize * 0.15, renderSize * 0.3, 0.85, 0.47, 0.02, 1.0);
+          } else if (u.job === 'CITY_STARTER') {
+            glR.pushQuad(wx + renderSize * 0.2, wy + offsetY - renderSize * 0.2, renderSize * 0.6, renderSize * 0.35, 0.9, 0.6, 0.1, 1.0);
+          } else if (u.job === 'PRINCE') {
+            glR.pushQuad(wx + renderSize * 0.3, wy + offsetY - renderSize * 0.25, renderSize * 0.4, renderSize * 0.25, 1.0, 0.84, 0.0, 1.0);
+          } else if (u.job === 'FISHERMAN') {
+            glR.pushQuad(wx + renderSize * 0.7, wy + offsetY + renderSize * 0.35, renderSize * 0.15, renderSize * 0.3, 0.2, 0.7, 0.9, 1.0);
           }
 
           if (u.carryingWood > 0 || u.hasBuildingWood) {
             glR.pushQuad(wx + renderSize * 0.1, wy + offsetY + renderSize * 0.1, renderSize * 0.25, renderSize * 0.25, 0.55, 0.43, 0.39, 1.0);
+          } else if (u.carryingStone > 0) {
+            glR.pushQuad(wx + renderSize * 0.1, wy + offsetY + renderSize * 0.1, renderSize * 0.25, renderSize * 0.25, 0.6, 0.6, 0.6, 1.0);
+          } else if (u.carryingGold > 0) {
+            glR.pushQuad(wx + renderSize * 0.1, wy + offsetY + renderSize * 0.1, renderSize * 0.25, renderSize * 0.25, 0.9, 0.75, 0.1, 1.0);
+          } else if (u.carryingIron > 0) {
+            glR.pushQuad(wx + renderSize * 0.1, wy + offsetY + renderSize * 0.1, renderSize * 0.25, renderSize * 0.25, 0.7, 0.3, 0.2, 1.0);
+          } else if (u.carryingFood > 0) {
+            glR.pushQuad(wx + renderSize * 0.1, wy + offsetY + renderSize * 0.1, renderSize * 0.25, renderSize * 0.25, 0.2, 0.7, 0.9, 1.0);
           }
+        }
+
+        if (u.carryingFood > 0 && u.isNaval) {
+          glR.pushQuad(wx + tileSize * 0.1, wy + tileSize * 0.1, tileSize * 0.25, tileSize * 0.25, 0.2, 0.7, 0.9, 1.0);
         }
 
         if (u.selected) {
@@ -1610,8 +1816,38 @@ class GameEngine {
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
     this.ctx.fillRect(sx + 3, sy + size * 0.7, size - 4, size * 0.25);
 
-    this.ctx.fillStyle = '#424242';
-    this.ctx.fillRect(sx + 2, sy + 4, size - 4, size - 6);
+    if (building.isHouse) {
+      const tier = building.tier || 0;
+      if (tier === 0) {
+        this.ctx.fillStyle = '#d1c4e9';
+        this.ctx.beginPath();
+        this.ctx.moveTo(sx + size / 2, sy + 2);
+        this.ctx.lineTo(sx + 3, sy + size - 2);
+        this.ctx.lineTo(sx + size - 3, sy + size - 2);
+        this.ctx.closePath();
+        this.ctx.fill();
+        return;
+      } else if (tier === 1) {
+        this.ctx.fillStyle = '#795548';
+        this.ctx.fillRect(sx + 2, sy + 4, size - 4, size - 6);
+      } else if (tier === 2) {
+        this.ctx.fillStyle = '#78909c';
+        this.ctx.fillRect(sx + 2, sy + 6, size - 4, size - 8);
+        this.ctx.fillStyle = '#5d4037';
+        this.ctx.fillRect(sx + 3, sy + 2, size - 6, 4);
+      } else if (tier === 3) {
+        this.ctx.fillStyle = '#546e7a';
+        this.ctx.fillRect(sx + 1, sy + 4, size - 2, size - 6);
+      } else {
+        this.ctx.fillStyle = '#37474f';
+        this.ctx.fillRect(sx, sy + 2, size, size - 4);
+        this.ctx.fillStyle = '#fbc02d';
+        this.ctx.fillRect(sx + size * 0.35, sy - 5, size * 0.3, 4);
+      }
+    } else {
+      this.ctx.fillStyle = '#424242';
+      this.ctx.fillRect(sx + 2, sy + 4, size - 4, size - 6);
+    }
 
     this.ctx.fillStyle = kColor;
     this.ctx.beginPath();

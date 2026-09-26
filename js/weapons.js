@@ -43,9 +43,22 @@ class Projectile {
         const d = Math.hypot(b.x - this.targetX, b.y - this.targetY);
         if (d <= this.config.blastRadius) {
           b.hp -= this.config.damage * (1 - d / (this.config.blastRadius + 1));
+          if (b.hp <= 0) {
+            b.isRuined = true;
+          }
         }
       });
       t.buildings = t.buildings.filter(b => b.hp > 0);
+      const hasActive = t.buildings.some(b => !b.isRuined);
+      if (!hasActive && !t.isRuined) {
+        t.isRuined = true;
+        if (t.isCapital) {
+          t.isCapital = false;
+          if (gameState.chooseNewCapital) {
+            gameState.chooseNewCapital(t.kingdomKey);
+          }
+        }
+      }
     });
 
     gameState.addExplosionFx(this.targetX, this.targetY, this.config.blastRadius, isNuke);

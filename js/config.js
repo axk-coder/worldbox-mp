@@ -96,23 +96,48 @@ const CONFIG = {
     WOOD: 'wood',
     STONE: 'stone',
     GOLD: 'gold',
-    FOOD: 'food'
+    IRON: 'iron',
+    FOOD: 'food',
+    STONE_ROCK: 'stone_rock',
+    GOLD_ORE: 'gold_ore',
+    IRON_ORE: 'iron_ore'
+  },
+  RESOURCE_NODES: {
+    TREE: { type: 'wood', amount: 150, name: 'Tree' },
+    STONE_ROCK: { type: 'stone', amount: 200, name: 'Stone Rock' },
+    GOLD_ORE: { type: 'gold', amount: 150, name: 'Gold Ore' },
+    IRON_ORE: { type: 'iron', amount: 150, name: 'Iron Ore' },
+    FISH: { type: 'food', amount: 120, name: 'Fish Spot' }
   },
   BUILDINGS: {
     TOWN_HALL: { id: 'TOWN_HALL', hp: 600, cost: { wood: 50, stone: 50 }, radius: 6 },
     STOCKPILE: { id: 'STOCKPILE', hp: 350, cost: { wood: 10 }, radius: 3 },
     HOUSE: { id: 'HOUSE', hp: 200, cost: { wood: 20 }, radius: 2 },
+    TENT: { id: 'TENT', hp: 80, cost: { wood: 10, stone: 0 }, capacity: 2, radius: 2, name: 'Tent' },
+    SMALL_HOUSE: { id: 'SMALL_HOUSE', hp: 200, cost: { wood: 20, stone: 0 }, capacity: 4, radius: 2, name: 'Small House' },
+    MID_HOUSE: { id: 'MID_HOUSE', hp: 350, cost: { wood: 30, stone: 15 }, capacity: 6, radius: 2, name: 'Mid House' },
+    BIG_HOUSE: { id: 'BIG_HOUSE', hp: 550, cost: { wood: 45, stone: 30 }, capacity: 8, radius: 2, name: 'Big House' },
+    MANSION: { id: 'MANSION', hp: 850, cost: { wood: 70, stone: 50 }, capacity: 12, radius: 2, name: 'Mansion' },
     BARRACKS: { id: 'BARRACKS', hp: 400, cost: { wood: 40, stone: 30 }, radius: 3 },
     FARM: { id: 'FARM', hp: 120, cost: { wood: 15 }, radius: 2 },
     DOCK: { id: 'DOCK', hp: 300, cost: { wood: 50, stone: 20 }, radius: 4 },
     TURRET: { id: 'TURRET', hp: 250, cost: { wood: 30, stone: 40 }, radius: 4 }
   },
+  HOUSE_TIERS: [
+    { tier: 0, id: 'TENT', name: 'Tent', hp: 80, cost: { wood: 10, stone: 0 }, capacity: 2 },
+    { tier: 1, id: 'SMALL_HOUSE', name: 'Small House', hp: 200, cost: { wood: 20, stone: 0 }, capacity: 4 },
+    { tier: 2, id: 'MID_HOUSE', name: 'Mid House', hp: 350, cost: { wood: 30, stone: 15 }, capacity: 6 },
+    { tier: 3, id: 'BIG_HOUSE', name: 'Big House', hp: 550, cost: { wood: 45, stone: 30 }, capacity: 8 },
+    { tier: 4, id: 'MANSION', name: 'Mansion', hp: 850, cost: { wood: 70, stone: 50 }, capacity: 12 }
+  ],
   UNITS: {
     WORKER: { id: 'WORKER', hp: 60, speed: 1.6, atk: 6, range: 1, isNaval: false, cost: { food: 15 } },
     INFANTRY: { id: 'INFANTRY', hp: 120, speed: 1.8, atk: 18, range: 1, isNaval: false, cost: { food: 20, wood: 5 } },
     ARCHER: { id: 'ARCHER', hp: 85, speed: 1.7, atk: 14, range: 5, isNaval: false, cost: { food: 20, wood: 15 } },
     BOAT_CANNON: { id: 'BOAT_CANNON', hp: 300, speed: 2.4, atk: 40, range: 8, isNaval: true, cost: { wood: 60, gold: 20 } },
-    BOAT_TRANSPORT: { id: 'BOAT_TRANSPORT', hp: 250, speed: 2.6, atk: 0, range: 0, isNaval: true, cost: { wood: 40 } }
+    BOAT_TRANSPORT: { id: 'BOAT_TRANSPORT', hp: 250, speed: 2.6, atk: 0, range: 0, isNaval: true, cost: { wood: 40 } },
+    FISHING_BOAT: { id: 'FISHING_BOAT', hp: 120, speed: 2.2, atk: 0, range: 1, isNaval: true, cost: { wood: 30, food: 10 } },
+    FISHERMAN: { id: 'FISHERMAN', hp: 80, speed: 2.0, atk: 4, range: 1, isNaval: true, cost: { wood: 20, food: 15 } }
   },
   WEAPONS: {
     BOMB: { id: 'BOMB', blastRadius: 4, damage: 200, crater: true },
@@ -125,6 +150,9 @@ const CONFIG = {
     TREE_CHOPPER: { id: 'TREE_CHOPPER', name: 'Tree Chopper', minAge: 18 },
     MINER: { id: 'MINER', name: 'Miner', minAge: 18 },
     HOUSE_BUILDER: { id: 'HOUSE_BUILDER', name: 'House Builder', minAge: 18 },
-    ARMY_MAN: { id: 'ARMY_MAN', name: 'Army Man', minAge: 18 }
+    ARMY_MAN: { id: 'ARMY_MAN', name: 'Army Man', minAge: 18 },
+    CITY_STARTER: { id: 'CITY_STARTER', name: 'City Starter', minAge: 18 },
+    PRINCE: { id: 'PRINCE', name: 'Prince', minAge: 18 },
+    FISHERMAN: { id: 'FISHERMAN', name: 'Fisherman', minAge: 18 }
   }
 };
